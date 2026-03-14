@@ -20,6 +20,7 @@ import { useSyncStore } from './syncStore';
 
 type TimerStateShape = Omit<TimerStateRecord, 'updatedAt'>;
 let durationSaveRequestId = 0;
+let completionRequestId = 0;
 
 interface TimerStoreState extends TimerStateRecord {
   isHydrated: boolean;
@@ -196,9 +197,18 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       return;
     }
 
+    const requestId = ++completionRequestId;
+
     const now = new Date();
     const endedAt = toLocalIsoString(now);
-    const persisted = await saveTimerState(stripUpdatedAt(timerEngine.finishNow(current, now)));
+    const nextState = timerEngine.finishNow(current, now);
+    set({ ...nextState });
+    const persisted = await saveTimerState(stripUpdatedAt(nextState));
+
+    if (requestId !== completionRequestId) {
+      return;
+    }
+
     set({ ...persisted });
 
     if (current.activeMode !== 'focus') {
@@ -208,7 +218,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     const task = current.selectedTaskId
       ? await getTaskById(current.selectedTaskId)
       : null;
-    const sessionInput = buildTrackedFocusSession(current, task, endedAt, now);
+    const sessionInput = buildTrackedFocusSession(current, task, endedAt);
 
     if (!sessionInput) {
       return;
@@ -226,8 +236,11 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       return;
     }
 
+    const requestId = ++completionRequestId;
+
     const completion = timerEngine.complete(current);
     const nextState = completion.nextState;
+    set({ ...nextState });
 
     if (completion.completedMode === 'focus') {
       const task = current.selectedTaskId
@@ -239,6 +252,10 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
         completion.completedAt,
       );
       const persisted = await saveTimerState(stripUpdatedAt(nextState));
+      if (requestId !== completionRequestId) {
+        return;
+      }
+
       set({ ...persisted });
 
       if (!sessionInput) {
@@ -253,6 +270,10 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     }
 
     const persisted = await saveTimerState(stripUpdatedAt(nextState));
+    if (requestId !== completionRequestId) {
+      return;
+    }
+
     set({ ...persisted });
   },
   handleDeletedTask: async (taskId) => {

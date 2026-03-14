@@ -3,6 +3,7 @@ import 'react-native-gesture-handler';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { colors } from '../src/constants/colors';
 import { initializeDatabase } from '../src/db/client';
@@ -82,21 +83,26 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="task/[id]" />
-      <Stack.Screen name="tag/[id]" />
-    </Stack>
+    <GestureHandlerRootView style={styles.root}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="task/[id]" />
+        <Stack.Screen name="tag/[id]" />
+      </Stack>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',

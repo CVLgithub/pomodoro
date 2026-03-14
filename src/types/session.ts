@@ -30,3 +30,7 @@ export interface UpdateSessionAssignmentInput {
   tagId: string;
 }
 
+export interface UpdateSessionInput {
+  title: string;
+  tagId: string;
+}

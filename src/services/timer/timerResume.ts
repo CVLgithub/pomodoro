@@ -2,7 +2,7 @@ import { FREE_SESSION_TITLE } from '../../constants/config';
 import { CreateSessionInput } from '../../types/session';
 import { Task } from '../../types/task';
 import { TimerStateRecord } from '../../types/timer';
-import { formatDateKey } from '../../utils/date';
+import { differenceInMinutes, formatDateKey } from '../../utils/date';
 import { timerEngine } from './timerEngine';
 
 export const getTrackedFocusMinutes = (
@@ -25,13 +25,13 @@ const buildFocusSession = (
   state: TimerStateRecord,
   task: Task | null,
   endedAt: string,
-  durationMinutes: number,
 ): CreateSessionInput | null => {
+  const startTime = state.sessionStartedAt ?? state.startedAt ?? endedAt;
+  const durationMinutes = differenceInMinutes(endedAt, startTime);
+
   if (durationMinutes <= 0) {
     return null;
   }
-
-  const startTime = state.sessionStartedAt ?? state.startedAt ?? endedAt;
 
   return {
     title: task?.title ?? FREE_SESSION_TITLE,
@@ -49,12 +49,11 @@ export const buildCompletedFocusSession = (
   state: TimerStateRecord,
   task: Task | null,
   completedAt: string,
-): CreateSessionInput | null => buildFocusSession(state, task, completedAt, state.focusMinutes);
+): CreateSessionInput | null => buildFocusSession(state, task, completedAt);
 
 export const buildTrackedFocusSession = (
   state: TimerStateRecord,
   task: Task | null,
   endedAt: string,
-  now = new Date(),
 ): CreateSessionInput | null =>
-  buildFocusSession(state, task, endedAt, getTrackedFocusMinutes(state, now));
+  buildFocusSession(state, task, endedAt);

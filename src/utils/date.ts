@@ -41,11 +41,20 @@ export const addSeconds = (value: string | Date, seconds: number): Date => {
 
 export const differenceInSeconds = (
   futureValue: string | Date,
-  fromValue = new Date(),
+  fromValue: string | Date = new Date(),
 ): number => {
   const future = parseDateInput(futureValue).getTime();
   const from = parseDateInput(fromValue).getTime();
   return Math.round((future - from) / 1000);
+};
+
+export const differenceInMinutes = (
+  futureValue: string | Date,
+  fromValue: string | Date = new Date(),
+): number => {
+  const future = parseDateInput(futureValue).getTime();
+  const from = parseDateInput(fromValue).getTime();
+  return Math.max(0, Math.round((future - from) / (60 * 1000)));
 };
 
 export const formatTimeLabel = (value: string | Date): string => {
@@ -77,4 +86,3 @@ export const isDateWithinRange = (
   const value = new Date(`${dateKey}T00:00:00`);
   return value.getTime() >= start.getTime() && value.getTime() <= end.getTime();
 };
-

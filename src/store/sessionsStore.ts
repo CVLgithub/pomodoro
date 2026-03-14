@@ -2,9 +2,11 @@ import { create } from 'zustand';
 
 import { FREE_SESSION_TITLE, GENERAL_TAG_ID } from '../constants/config';
 import {
+  deleteSession,
   getLatestSession,
   getSessionById,
   listSessions,
+  updateSession,
   updateSessionAssignment,
 } from '../db/repositories/sessionsRepository';
 import { getTaskById } from '../db/repositories/tasksRepository';
@@ -25,6 +27,8 @@ interface SessionsStoreState {
   loadSessions: () => Promise<void>;
   refreshLatestSession: () => Promise<void>;
   assignSession: (sessionId: string, options: SessionAssignmentOptions) => Promise<void>;
+  updateSessionEntry: (sessionId: string, input: { title: string; tagId: string }) => Promise<void>;
+  deleteSessionEntry: (sessionId: string) => Promise<void>;
 }
 
 const swallowSyncError = async (work: Promise<void>): Promise<void> => {
@@ -85,6 +89,21 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
 
     await get().loadSessions();
     await swallowSyncError(syncManager.pushSession(toSessionPushPayload(updatedSession)));
+    await useSyncStore.getState().loadQueue();
+  },
+  updateSessionEntry: async (sessionId, input) => {
+    if (!input.title.trim()) {
+      throw new Error('Name is required');
+    }
+
+    const updatedSession = await updateSession(sessionId, input);
+    await get().loadSessions();
+    await swallowSyncError(syncManager.pushSession(toSessionPushPayload(updatedSession)));
+    await useSyncStore.getState().loadQueue();
+  },
+  deleteSessionEntry: async (sessionId) => {
+    await deleteSession(sessionId);
+    await get().loadSessions();
     await useSyncStore.getState().loadQueue();
   },
 }));

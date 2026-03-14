@@ -3,10 +3,12 @@ import {
   CreateSessionInput,
   SessionSyncStatus,
   UpdateSessionAssignmentInput,
+  UpdateSessionInput,
 } from '../../types/session';
-import { toLocalIsoString } from '../../utils/date';
+import { differenceInMinutes, toLocalIsoString } from '../../utils/date';
 import { createUuid } from '../../utils/uuid';
 import { getDatabase } from '../client';
+import { deleteSyncQueueItemsByEntity } from './syncQueueRepository';
 
 type SessionRow = {
   id: string;
@@ -77,13 +79,14 @@ export const getLatestSession = async (): Promise<Session | null> => {
 
 export const createSession = async (input: CreateSessionInput): Promise<Session> => {
   const db = await getDatabase();
+  const durationMinutes = differenceInMinutes(input.endTime, input.startTime);
   const session: Session = {
     id: createUuid(),
     title: input.title,
     date: input.date,
     startTime: input.startTime,
     endTime: input.endTime,
-    durationMinutes: input.durationMinutes,
+    durationMinutes,
     taskId: input.taskId ?? null,
     tagId: input.tagId,
     syncStatus: input.syncStatus ?? 'pending',
@@ -112,6 +115,13 @@ export const createSession = async (input: CreateSessionInput): Promise<Session>
   return session;
 };
 
+export const deleteSession = async (id: string): Promise<void> => {
+  const db = await getDatabase();
+
+  await db.runAsync('DELETE FROM sessions WHERE id = ?;', id);
+  await deleteSyncQueueItemsByEntity('session', id);
+};
+
 export const updateSessionAssignment = async (
   id: string,
   input: UpdateSessionAssignmentInput,
@@ -138,6 +148,39 @@ export const updateSessionAssignment = async (
       WHERE id = ?;
     `,
     updatedSession.taskId,
+    updatedSession.title,
+    updatedSession.tagId,
+    updatedSession.syncStatus,
+    updatedSession.id,
+  );
+
+  return updatedSession;
+};
+
+export const updateSession = async (
+  id: string,
+  input: UpdateSessionInput,
+): Promise<Session> => {
+  const db = await getDatabase();
+  const existingSession = await getSessionById(id);
+
+  if (!existingSession) {
+    throw new Error('Session not found');
+  }
+
+  const updatedSession: Session = {
+    ...existingSession,
+    title: input.title.trim(),
+    tagId: input.tagId,
+    syncStatus: 'pending',
+  };
+
+  await db.runAsync(
+    `
+      UPDATE sessions
+      SET title = ?, tagId = ?, syncStatus = ?
+      WHERE id = ?;
+    `,
     updatedSession.title,
     updatedSession.tagId,
     updatedSession.syncStatus,

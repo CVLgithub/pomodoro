@@ -99,3 +99,14 @@ export const updateSyncQueueItemStatus = async (
   );
 };
 
+export const deleteSyncQueueItemsByEntity = async (
+  entityType: SyncQueueItem['entityType'],
+  entityId: string,
+): Promise<void> => {
+  const db = await getDatabase();
+  await db.runAsync(
+    'DELETE FROM sync_queue WHERE entityType = ? AND entityId = ?;',
+    entityType,
+    entityId,
+  );
+};

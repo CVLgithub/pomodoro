@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
@@ -9,9 +9,10 @@ import { formatMinutesShort } from '../../utils/duration';
 interface SessionDayGroupProps {
   date: string;
   sessions: Session[];
+  onPressSession: (session: Session) => void;
 }
 
-export const SessionDayGroup = ({ date, sessions }: SessionDayGroupProps) => {
+export const SessionDayGroup = ({ date, sessions, onPressSession }: SessionDayGroupProps) => {
   const totalMinutes = sessions.reduce((total, session) => total + session.durationMinutes, 0);
 
   return (
@@ -22,15 +23,17 @@ export const SessionDayGroup = ({ date, sessions }: SessionDayGroupProps) => {
       </View>
       <View style={styles.list}>
         {sessions.map((session) => (
-          <View key={session.id} style={styles.row}>
-            <View style={styles.textBlock}>
-              <Text style={styles.title}>{session.title}</Text>
-              <Text style={styles.meta}>
-                {formatTimeLabel(session.startTime)} - {formatTimeLabel(session.endTime)}
-              </Text>
+          <Pressable key={session.id} onPress={() => onPressSession(session)}>
+            <View style={styles.row}>
+              <View style={styles.textBlock}>
+                <Text style={styles.title}>{session.title}</Text>
+                <Text style={styles.meta}>
+                  {formatTimeLabel(session.startTime)} - {formatTimeLabel(session.endTime)}
+                </Text>
+              </View>
+              <Text style={styles.duration}>{formatMinutesShort(session.durationMinutes)}</Text>
             </View>
-            <Text style={styles.duration}>{formatMinutesShort(session.durationMinutes)}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
     </View>
@@ -68,6 +71,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.md,
+    alignItems: 'center',
   },
   textBlock: {
     flex: 1,
@@ -88,4 +92,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
