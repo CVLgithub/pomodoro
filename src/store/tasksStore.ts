@@ -15,6 +15,7 @@ import { syncManager } from '../services/sync/syncManager';
 import {
   createTaskDeletePayload,
   toSessionPushPayload,
+  toTaskPushPayload,
 } from '../services/sync/payloads';
 import { CreateTaskInput, Task, UpdateTaskInput } from '../types/task';
 import { useSessionsStore } from './sessionsStore';
@@ -62,7 +63,7 @@ export const useTasksStore = create<TasksStoreState>((set, get) => ({
       tagId: input.tagId ?? GENERAL_TAG_ID,
     });
     await get().loadTasks();
-    await swallowSyncError(syncManager.pushTask(task.id, task));
+    await swallowSyncError(syncManager.pushTask(task.id, toTaskPushPayload(task)));
     await useSyncStore.getState().loadQueue();
     return task;
   },
@@ -73,7 +74,7 @@ export const useTasksStore = create<TasksStoreState>((set, get) => ({
 
     const task = await updateTaskRecord(id, input);
     await get().loadTasks();
-    await swallowSyncError(syncManager.pushTask(task.id, task));
+    await swallowSyncError(syncManager.pushTask(task.id, toTaskPushPayload(task)));
     await useSyncStore.getState().loadQueue();
     return task;
   },

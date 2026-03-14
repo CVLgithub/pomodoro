@@ -19,6 +19,21 @@
     "experiments": {
       "typedRoutes": true,
       "autolinkingModuleResolution": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "07d63ace-8f18-4a56-bce8-2995f8fe3bda"
+      }
+    },
+    "android": {
+      "package": "com.constantin.pomodoro"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/07d63ace-8f18-4a56-bce8-2995f8fe3bda"
     }
   }
 }

@@ -26,12 +26,17 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     }
   },
   retryItem: async (id) => {
-    await syncManager.retryQueueItem(id);
-    await get().loadQueue();
+    try {
+      await syncManager.retryQueueItem(id);
+    } finally {
+      await get().loadQueue();
+    }
   },
   retryAll: async () => {
-    await syncManager.retryAllFailed();
-    await get().loadQueue();
+    try {
+      await syncManager.retryAllFailed();
+    } finally {
+      await get().loadQueue();
+    }
   },
 }));
-

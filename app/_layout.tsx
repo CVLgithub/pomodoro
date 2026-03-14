@@ -8,6 +8,7 @@ import { colors } from '../src/constants/colors';
 import { initializeDatabase } from '../src/db/client';
 import { useAppResume } from '../src/hooks/useAppResume';
 import { useSessionsStore } from '../src/store/sessionsStore';
+import { useSettingsStore } from '../src/store/settingsStore';
 import { useSyncStore } from '../src/store/syncStore';
 import { useTagsStore } from '../src/store/tagsStore';
 import { useTasksStore } from '../src/store/tasksStore';
@@ -25,6 +26,7 @@ export default function RootLayout() {
     const bootstrap = async () => {
       try {
         await initializeDatabase();
+        await useSettingsStore.getState().loadSettings();
         await Promise.all([
           useTagsStore.getState().loadTags(),
           useTasksStore.getState().loadTasks(),

@@ -14,6 +14,8 @@ import { syncManager } from '../services/sync/syncManager';
 import {
   createTagDeletePayload,
   toSessionPushPayload,
+  toTagPushPayload,
+  toTaskPushPayload,
 } from '../services/sync/payloads';
 import { CreateTagInput, Tag, UpdateTagInput } from '../types/tag';
 import { useSessionsStore } from './sessionsStore';
@@ -42,7 +44,7 @@ const syncReassignedEntities = async (result: DeleteTagResult): Promise<void> =>
   for (const taskId of result.reassignedTaskIds) {
     const task = await getTaskById(taskId);
     if (task) {
-      await swallowSyncError(syncManager.pushTask(task.id, task));
+      await swallowSyncError(syncManager.pushTask(task.id, toTaskPushPayload(task)));
     }
   }
 
@@ -74,7 +76,7 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
 
     const tag = await createTagRecord(input);
     await get().loadTags();
-    await swallowSyncError(syncManager.pushTag(tag.id, tag));
+    await swallowSyncError(syncManager.pushTag(tag.id, toTagPushPayload(tag)));
     await useSyncStore.getState().loadQueue();
     return tag;
   },
@@ -85,7 +87,7 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
 
     const tag = await updateTagRecord(id, input);
     await get().loadTags();
-    await swallowSyncError(syncManager.pushTag(tag.id, tag));
+    await swallowSyncError(syncManager.pushTag(tag.id, toTagPushPayload(tag)));
     await useSyncStore.getState().loadQueue();
     return tag;
   },

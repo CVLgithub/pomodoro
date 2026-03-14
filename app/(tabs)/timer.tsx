@@ -32,6 +32,7 @@ export default function TimerScreen() {
     pause,
     resume,
     reset,
+    finishNow,
   } = useTimerStore(useShallow((state) => ({
     setMode: state.setMode,
     setDurations: state.setDurations,
@@ -41,6 +42,7 @@ export default function TimerScreen() {
     pause: state.pause,
     resume: state.resume,
     reset: state.reset,
+    finishNow: state.finishNow,
   })));
 
   const runSafely = async (work: () => Promise<void>, title: string) => {
@@ -111,12 +113,40 @@ export default function TimerScreen() {
       </SectionCard>
 
       <SectionCard>
-        <SectionHeader title="Steuerung" subtitle={timer.activeMode === 'longBreak' && timer.status === 'idle' ? 'Vier Fokus-Sessions abgeschlossen. Lange Pause ist bereit.' : 'Pausen starten nie automatisch.'} />
+        <SectionHeader
+          title="Steuerung"
+          subtitle={
+            timer.activeMode === 'longBreak' && timer.status === 'idle'
+              ? 'Vier Fokus-Sessions abgeschlossen. Lange Pause ist bereit.'
+              : 'Pausen starten nie automatisch.'
+          }
+        />
         <View style={{ gap: 12 }}>
-          {timer.status === 'idle' ? <Button label="Start" onPress={() => void runSafely(start, 'Timer konnte nicht gestartet werden')} /> : null}
-          {timer.status === 'running' ? <Button label="Pause" variant="secondary" onPress={() => void runSafely(pause, 'Timer konnte nicht pausiert werden')} /> : null}
-          {timer.status === 'paused' ? <Button label="Weiter" onPress={() => void runSafely(resume, 'Timer konnte nicht fortgesetzt werden')} /> : null}
-          <Button label="Reset" variant="ghost" onPress={() => void runSafely(reset, 'Timer konnte nicht zurückgesetzt werden')} />
+          {timer.status === 'idle' ? (
+            <Button label="Start" onPress={() => void runSafely(start, 'Timer konnte nicht gestartet werden')} />
+          ) : null}
+          {timer.status === 'running' ? (
+            <Button
+              label="Pause"
+              variant="secondary"
+              onPress={() => void runSafely(pause, 'Timer konnte nicht pausiert werden')}
+            />
+          ) : null}
+          {timer.status === 'paused' ? (
+            <Button label="Weiter" onPress={() => void runSafely(resume, 'Timer konnte nicht fortgesetzt werden')} />
+          ) : null}
+          {timer.status !== 'idle' ? (
+            <Button
+              label="Jetzt beenden"
+              variant="danger"
+              onPress={() => void runSafely(finishNow, 'Timer konnte nicht beendet werden')}
+            />
+          ) : null}
+          <Button
+            label="Reset"
+            variant="ghost"
+            onPress={() => void runSafely(reset, 'Timer konnte nicht zurückgesetzt werden')}
+          />
         </View>
       </SectionCard>
 

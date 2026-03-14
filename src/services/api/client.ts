@@ -1,10 +1,11 @@
-import { BACKEND_URL } from '../../constants/config';
+import { useSettingsStore } from '../../store/settingsStore';
 
 export const postJson = async <TPayload>(
   endpoint: string,
   payload: TPayload,
 ): Promise<void> => {
-  const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+  const backendUrl = useSettingsStore.getState().backendUrl;
+  const response = await fetch(`${backendUrl}${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -17,4 +18,3 @@ export const postJson = async <TPayload>(
     throw new Error(body || `Request failed with status ${response.status}`);
   }
 };
-

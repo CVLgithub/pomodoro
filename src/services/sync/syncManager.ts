@@ -1,7 +1,6 @@
 import { createSyncQueueItem, getSyncQueueItemById, listSyncQueueItems, updateSyncQueueItemStatus } from '../../db/repositories/syncQueueRepository';
 import { updateSessionSyncStatus } from '../../db/repositories/sessionsRepository';
 import { PushSessionPayload, PushTagPayload, PushTaskPayload } from '../../types/api';
-import { Session } from '../../types/session';
 import { SyncEntityType, SyncQueueItem } from '../../types/sync';
 import { pushSessionPayload, pushTagPayload, pushTaskPayload } from '../api/pushService';
 
@@ -14,13 +13,63 @@ const syncHandlers: Record<
   session: async (payload) => pushSessionPayload(payload as PushSessionPayload),
 };
 
+const normalizeSyncPayload = (
+  entityType: SyncEntityType,
+  payload: PushTaskPayload | PushTagPayload | PushSessionPayload,
+): PushTaskPayload | PushTagPayload | PushSessionPayload => {
+  if (entityType === 'task') {
+    const taskPayload = payload as PushTaskPayload;
+
+    if ('isDeleted' in taskPayload) {
+      return taskPayload;
+    }
+
+    return {
+      id: taskPayload.id,
+      title: taskPayload.title,
+      date: taskPayload.date,
+      tagId: taskPayload.tagId,
+      isCompleted: taskPayload.isCompleted,
+    };
+  }
+
+  if (entityType === 'tag') {
+    const tagPayload = payload as PushTagPayload;
+
+    if ('isDeleted' in tagPayload) {
+      return tagPayload;
+    }
+
+    return {
+      id: tagPayload.id,
+      name: tagPayload.name,
+      color: tagPayload.color,
+    };
+  }
+
+  const sessionPayload = payload as PushSessionPayload;
+
+  return {
+    id: sessionPayload.id,
+    title: sessionPayload.title,
+    date: sessionPayload.date,
+    startTime: sessionPayload.startTime,
+    endTime: sessionPayload.endTime,
+    durationMinutes: sessionPayload.durationMinutes,
+    taskId: sessionPayload.taskId,
+    tagId: sessionPayload.tagId,
+  };
+};
+
 const performSyncRequest = async (
   item: SyncQueueItem,
   payload: PushTaskPayload | PushTagPayload | PushSessionPayload,
   retryCount = item.retryCount,
 ): Promise<void> => {
+  const normalizedPayload = normalizeSyncPayload(item.entityType, payload);
+
   try {
-    await syncHandlers[item.entityType](payload);
+    await syncHandlers[item.entityType](normalizedPayload);
     await updateSyncQueueItemStatus(item.id, 'synced', { retryCount });
 
     if (item.entityType === 'session') {
@@ -47,14 +96,15 @@ const enqueueAndPush = async (
   endpoint: string,
   payload: PushTaskPayload | PushTagPayload | PushSessionPayload,
 ): Promise<void> => {
+  const normalizedPayload = normalizeSyncPayload(entityType, payload);
   const queueItem = await createSyncQueueItem({
     entityType,
     entityId,
     endpoint,
-    payloadJson: JSON.stringify(payload),
+    payloadJson: JSON.stringify(normalizedPayload),
   });
 
-  await performSyncRequest(queueItem, payload);
+  await performSyncRequest(queueItem, normalizedPayload);
 };
 
 export const syncManager = {
@@ -64,8 +114,8 @@ export const syncManager = {
   pushTag: async (entityId: string, payload: PushTagPayload): Promise<void> => {
     await enqueueAndPush('tag', entityId, '/push/tag', payload);
   },
-  pushSession: async (session: Omit<Session, 'syncStatus'>): Promise<void> => {
-    await enqueueAndPush('session', session.id, '/push/session', session);
+  pushSession: async (payload: PushSessionPayload): Promise<void> => {
+    await enqueueAndPush('session', payload.id, '/push/session', payload);
   },
   retryQueueItem: async (queueItemId: string): Promise<void> => {
     const item = await getSyncQueueItemById(queueItemId);
@@ -94,4 +144,3 @@ export const syncManager = {
     }
   },
 };
-

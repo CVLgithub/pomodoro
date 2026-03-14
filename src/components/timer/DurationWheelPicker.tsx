@@ -21,16 +21,18 @@ export const DurationWheelPicker = ({
     <Text style={styles.label}>{label}</Text>
     <View style={styles.pickerWrap}>
       <Picker
+        style={styles.picker}
         enabled={!disabled}
         selectedValue={value}
         itemStyle={styles.item}
         onValueChange={(nextValue) => onChange(Number(nextValue))}
       >
         {Array.from({ length: 60 }, (_, index) => index + 1).map((minutes) => (
-          <Picker.Item key={minutes} label={`${minutes} min`} value={minutes} />
+          <Picker.Item key={minutes} label={String(minutes).padStart(2, '0')} value={minutes} />
         ))}
       </Picker>
     </View>
+    <Text style={styles.unit}>Min</Text>
   </View>
 );
 
@@ -52,9 +54,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
   },
+  picker: {
+    width: '100%',
+  },
   item: {
     color: colors.textPrimary,
     fontSize: 18,
   },
+  unit: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
 });
-

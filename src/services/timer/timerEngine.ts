@@ -54,6 +54,11 @@ export const timerEngine = {
 
     return durationForMode(state, state.activeMode);
   },
+  getElapsedSeconds: (state: TimerStateRecord, now = new Date()): number =>
+    Math.max(
+      0,
+      durationForMode(state, state.activeMode) - timerEngine.getRemainingSeconds(state, now),
+    ),
   withMode: (state: TimerStateRecord, activeMode: TimerMode): TimerStateRecord => ({
     ...state,
     activeMode,
@@ -120,6 +125,15 @@ export const timerEngine = {
     pausedRemainingSeconds: null,
     updatedAt: toLocalIsoString(),
   }),
+  finishNow: (state: TimerStateRecord, now = new Date()): TimerStateRecord => ({
+    ...state,
+    status: 'idle',
+    sessionStartedAt: null,
+    startedAt: null,
+    expectedEndAt: null,
+    pausedRemainingSeconds: null,
+    updatedAt: toLocalIsoString(now),
+  }),
   complete: (
     state: TimerStateRecord,
     completedAt = new Date(),
@@ -152,4 +166,3 @@ export const timerEngine = {
     };
   },
 };
-

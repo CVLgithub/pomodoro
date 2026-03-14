@@ -1,7 +1,8 @@
 import { TimerDurations } from '../types/timer';
 
-export const BACKEND_URL =
+export const DEFAULT_BACKEND_URL =
   process.env.EXPO_PUBLIC_BACKEND_URL?.trim() || 'http://localhost:3000';
+export const BACKEND_URL = DEFAULT_BACKEND_URL;
 
 export const DATABASE_NAME = 'pomodoro.db';
 export const GENERAL_TAG_ID = '00000000-0000-4000-8000-000000000001';
@@ -15,4 +16,3 @@ export const DEFAULT_TIMER_DURATIONS: TimerDurations = {
 };
 
 export const FOCUS_CYCLE_LENGTH = 4;
-

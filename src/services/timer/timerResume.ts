@@ -5,6 +5,11 @@ import { TimerStateRecord } from '../../types/timer';
 import { formatDateKey } from '../../utils/date';
 import { timerEngine } from './timerEngine';
 
+export const getTrackedFocusMinutes = (
+  state: TimerStateRecord,
+  now = new Date(),
+): number => Math.floor(timerEngine.getElapsedSeconds(state, now) / 60);
+
 export const isTimerExpired = (
   state: TimerStateRecord,
   now = new Date(),
@@ -16,21 +21,40 @@ export const isTimerExpired = (
   );
 };
 
-export const buildCompletedFocusSession = (
+const buildFocusSession = (
   state: TimerStateRecord,
   task: Task | null,
-  completedAt: string,
-): CreateSessionInput => {
-  const startTime = state.sessionStartedAt ?? state.startedAt ?? completedAt;
+  endedAt: string,
+  durationMinutes: number,
+): CreateSessionInput | null => {
+  if (durationMinutes <= 0) {
+    return null;
+  }
+
+  const startTime = state.sessionStartedAt ?? state.startedAt ?? endedAt;
 
   return {
     title: task?.title ?? FREE_SESSION_TITLE,
     date: formatDateKey(startTime),
     startTime,
-    endTime: completedAt,
-    durationMinutes: state.focusMinutes,
+    endTime: endedAt,
+    durationMinutes,
     taskId: task?.id ?? null,
     tagId: task?.tagId ?? state.selectedTagId,
     syncStatus: 'pending',
   };
 };
+
+export const buildCompletedFocusSession = (
+  state: TimerStateRecord,
+  task: Task | null,
+  completedAt: string,
+): CreateSessionInput | null => buildFocusSession(state, task, completedAt, state.focusMinutes);
+
+export const buildTrackedFocusSession = (
+  state: TimerStateRecord,
+  task: Task | null,
+  endedAt: string,
+  now = new Date(),
+): CreateSessionInput | null =>
+  buildFocusSession(state, task, endedAt, getTrackedFocusMinutes(state, now));

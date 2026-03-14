@@ -1,8 +1,12 @@
-import { Session } from './session';
 import { Tag, TagDeletePayload } from './tag';
 import { Task, TaskDeletePayload } from './task';
+import { Session } from './session';
 
-export type PushTaskPayload = Task | TaskDeletePayload;
-export type PushTagPayload = Tag | TagDeletePayload;
-export type PushSessionPayload = Omit<Session, 'syncStatus'>;
-
+export type PushTaskPayload =
+  | Pick<Task, 'id' | 'title' | 'date' | 'tagId' | 'isCompleted'>
+  | TaskDeletePayload;
+export type PushTagPayload = Pick<Tag, 'id' | 'name' | 'color'> | TagDeletePayload;
+export type PushSessionPayload = Pick<
+  Session,
+  'id' | 'title' | 'date' | 'startTime' | 'endTime' | 'durationMinutes' | 'taskId' | 'tagId'
+>;

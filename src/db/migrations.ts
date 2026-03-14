@@ -1,5 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
+import { DEFAULT_BACKEND_URL } from '../constants/config';
+import { toLocalIsoString } from '../utils/date';
 import { buildSchemaStatements } from './schema';
 
 type UserVersionRow = {
@@ -10,6 +12,26 @@ const migrations = [
   {
     version: 1,
     statements: buildSchemaStatements,
+  },
+  {
+    version: 2,
+    statements: () => {
+      const now = toLocalIsoString();
+
+      return [
+        `
+          CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          );
+        `,
+        `
+          INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+          VALUES ('backendUrl', '${DEFAULT_BACKEND_URL}', '${now}');
+        `,
+      ];
+    },
   },
 ] as const;
 
@@ -37,4 +59,3 @@ export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> =>
     }
   }
 };
-

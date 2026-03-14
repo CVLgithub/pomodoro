@@ -7,13 +7,19 @@ import { getTaskById } from '../db/repositories/tasksRepository';
 import { getTimerState, saveTimerState } from '../db/repositories/timerStateRepository';
 import { syncManager } from '../services/sync/syncManager';
 import { toSessionPushPayload } from '../services/sync/payloads';
-import { buildCompletedFocusSession, isTimerExpired } from '../services/timer/timerResume';
+import {
+  buildCompletedFocusSession,
+  buildTrackedFocusSession,
+  isTimerExpired,
+} from '../services/timer/timerResume';
 import { timerEngine } from '../services/timer/timerEngine';
 import { TimerMode, TimerStateRecord } from '../types/timer';
+import { toLocalIsoString } from '../utils/date';
 import { useSessionsStore } from './sessionsStore';
 import { useSyncStore } from './syncStore';
 
 type TimerStateShape = Omit<TimerStateRecord, 'updatedAt'>;
+let durationSaveRequestId = 0;
 
 interface TimerStoreState extends TimerStateRecord {
   isHydrated: boolean;
@@ -30,6 +36,7 @@ interface TimerStoreState extends TimerStateRecord {
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   reset: () => Promise<void>;
+  finishNow: () => Promise<void>;
   reconcileWithClock: () => Promise<void>;
   handleDeletedTask: (taskId: string) => Promise<void>;
   handleDeletedTag: (tagId: string) => Promise<void>;
@@ -93,9 +100,16 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       throw new Error('Minutes must be greater than zero');
     }
 
-    const persisted = await saveTimerState(
-      stripUpdatedAt(timerEngine.withDurations(get(), durations)),
-    );
+    const nextState = timerEngine.withDurations(get(), durations);
+    const requestId = ++durationSaveRequestId;
+
+    set({ ...nextState });
+
+    const persisted = await saveTimerState(stripUpdatedAt(nextState));
+    if (requestId !== durationSaveRequestId) {
+      return;
+    }
+
     set({ ...persisted });
   },
   selectTask: async (taskId) => {
@@ -176,6 +190,35 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     const persisted = await saveTimerState(stripUpdatedAt(timerEngine.reset(get())));
     set({ ...persisted });
   },
+  finishNow: async () => {
+    const current = get();
+    if (current.status === 'idle') {
+      return;
+    }
+
+    const now = new Date();
+    const endedAt = toLocalIsoString(now);
+    const persisted = await saveTimerState(stripUpdatedAt(timerEngine.finishNow(current, now)));
+    set({ ...persisted });
+
+    if (current.activeMode !== 'focus') {
+      return;
+    }
+
+    const task = current.selectedTaskId
+      ? await getTaskById(current.selectedTaskId)
+      : null;
+    const sessionInput = buildTrackedFocusSession(current, task, endedAt, now);
+
+    if (!sessionInput) {
+      return;
+    }
+
+    const createdSession = await createSession(sessionInput);
+    await useSessionsStore.getState().loadSessions();
+    await swallowSyncError(syncManager.pushSession(toSessionPushPayload(createdSession)));
+    await useSyncStore.getState().loadQueue();
+  },
   reconcileWithClock: async () => {
     const current = get();
 
@@ -195,10 +238,14 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
         task,
         completion.completedAt,
       );
-      const createdSession = await createSession(sessionInput);
-
       const persisted = await saveTimerState(stripUpdatedAt(nextState));
       set({ ...persisted });
+
+      if (!sessionInput) {
+        return;
+      }
+
+      const createdSession = await createSession(sessionInput);
       await useSessionsStore.getState().loadSessions();
       await swallowSyncError(syncManager.pushSession(toSessionPushPayload(createdSession)));
       await useSyncStore.getState().loadQueue();

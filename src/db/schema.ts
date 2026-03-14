@@ -1,5 +1,6 @@
 import {
   DEFAULT_TIMER_DURATIONS,
+  DEFAULT_BACKEND_URL,
   GENERAL_TAG_ID,
   GENERAL_TAG_NAME,
 } from '../constants/config';
@@ -62,6 +63,13 @@ export const buildSchemaStatements = (): string[] => {
       );
     `,
     `
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+    `,
+    `
       CREATE TABLE IF NOT EXISTS timer_state (
         id TEXT PRIMARY KEY NOT NULL,
         activeMode TEXT NOT NULL,
@@ -87,6 +95,10 @@ export const buildSchemaStatements = (): string[] => {
     'CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions (date DESC);',
     'CREATE INDEX IF NOT EXISTS idx_sessions_sync_status ON sessions (syncStatus);',
     'CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue (status, updatedAt DESC);',
+    `
+      INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+      VALUES ('backendUrl', '${DEFAULT_BACKEND_URL}', '${now}');
+    `,
     `
       INSERT OR IGNORE INTO tags (id, name, color, createdAt, updatedAt)
       VALUES ('${GENERAL_TAG_ID}', '${GENERAL_TAG_NAME}', '#5EA2FF', '${now}', '${now}');
@@ -127,4 +139,3 @@ export const buildSchemaStatements = (): string[] => {
     `,
   ];
 };
-
