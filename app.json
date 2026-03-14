@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Pomodoro",
+    "slug": "pomodoro-local-first",
+    "scheme": "pomodoro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-font"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.constantin.pomodoro"
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "autolinkingModuleResolution": true
+    }
+  }
+}
