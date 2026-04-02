@@ -20,11 +20,14 @@ export const useTimer = () => {
   })));
   const reconcileWithClock = useTimerStore((state) => state.reconcileWithClock);
   const [now, setNow] = useState(() => new Date());
+  const effectiveNow = timerState.status === 'running' ? new Date() : now;
 
   useEffect(() => {
     if (timerState.status !== 'running') {
       return;
     }
+
+    setNow(new Date());
 
     const interval = setInterval(() => {
       setNow(new Date());
@@ -44,16 +47,16 @@ export const useTimer = () => {
       updatedAt: '',
       ...timerState,
     };
-    const remainingSeconds = timerEngine.getRemainingSeconds(baseTimerState, now);
+    const remainingSeconds = timerEngine.getRemainingSeconds(baseTimerState, effectiveNow);
     const totalSeconds = timerEngine.getDurationSeconds(baseTimerState, timerState.activeMode);
 
     return {
       ...timerState,
-      now,
+      now: effectiveNow,
       remainingSeconds,
       totalSeconds,
       progress: totalSeconds === 0 ? 0 : 1 - remainingSeconds / totalSeconds,
       formattedRemaining: formatDurationClock(remainingSeconds),
     };
-  }, [now, timerState]);
+  }, [effectiveNow, timerState]);
 };

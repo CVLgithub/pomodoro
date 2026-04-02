@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
-import { spacing } from '../../constants/spacing';
+import { radii, spacing } from '../../constants/spacing';
 import { Tag } from '../../types/tag';
 import { Task } from '../../types/task';
 import { Button } from '../ui/Button';
@@ -13,6 +13,7 @@ import { TagPill } from '../ui/TagPill';
 
 interface TaskAssignmentCardProps {
   title: string;
+  subtitle?: string;
   tasks: Task[];
   tags: Tag[];
   selectedTaskId: string | null;
@@ -21,8 +22,15 @@ interface TaskAssignmentCardProps {
   onSelectFreeTag: (tagId: string) => Promise<void> | void;
 }
 
+type TaskGroup = {
+  tagId: string;
+  tag: Tag | null;
+  tasks: Task[];
+};
+
 export const TaskAssignmentCard = ({
   title,
+  subtitle,
   tasks,
   tags,
   selectedTaskId,
@@ -43,15 +51,66 @@ export const TaskAssignmentCard = ({
     [activeTagId, tags],
   );
   const availableTasks = useMemo(
-    () => [...tasks].sort((left, right) => Number(left.isCompleted) - Number(right.isCompleted)),
+    () =>
+      [...tasks].sort((left, right) => {
+        const completionSort = Number(left.isCompleted) - Number(right.isCompleted);
+        if (completionSort !== 0) {
+          return completionSort;
+        }
+
+        if (left.date && right.date && left.date !== right.date) {
+          return left.date.localeCompare(right.date);
+        }
+
+        if (left.date && !right.date) {
+          return -1;
+        }
+
+        if (!left.date && right.date) {
+          return 1;
+        }
+
+        return left.title.localeCompare(right.title, 'de-DE');
+      }),
     [tasks],
   );
+  const groupedTasks = useMemo(() => {
+    const tagById = new Map(tags.map((tag) => [tag.id, tag]));
+    const groups = availableTasks.reduce((result, task) => {
+      const entries = result.get(task.tagId) ?? [];
+      entries.push(task);
+      result.set(task.tagId, entries);
+      return result;
+    }, new Map<string, Task[]>());
+
+    return Array.from(groups.entries())
+      .map(([tagId, tagTasks]) => ({
+        tagId,
+        tag: tagById.get(tagId) ?? null,
+        tasks: tagTasks,
+      }))
+      .sort((left, right) => {
+        if (left.tag && right.tag) {
+          return left.tag.name.localeCompare(right.tag.name, 'de-DE');
+        }
+
+        if (left.tag) {
+          return -1;
+        }
+
+        if (right.tag) {
+          return 1;
+        }
+
+        return 0;
+      });
+  }, [availableTasks, tags]);
 
   return (
     <SectionCard>
       <SectionHeader
         title={title}
-        subtitle={selectedTask ? 'Aufgabe verknüpft' : 'Freie Session'}
+        subtitle={subtitle ?? (selectedTask ? 'Aufgabe verknüpft' : 'Freie Session')}
       />
       <View style={styles.assignment}>
         <View style={styles.selectionBlock}>
@@ -78,21 +137,32 @@ export const TaskAssignmentCard = ({
         onClose={() => setTaskModalVisible(false)}
       >
         <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-          {availableTasks.map((task) => (
-            <Pressable
-              key={task.id}
-              onPress={async () => {
-                await onSelectTask(task.id);
-                setTaskModalVisible(false);
-              }}
-              style={styles.modalRow}
-            >
-              <Text style={styles.modalTitle}>{task.title}</Text>
-              <Text style={styles.modalMeta}>
-                {task.date ? `${task.date} · ` : ''}
-                {task.isCompleted ? 'Erledigt' : 'Offen'}
-              </Text>
-            </Pressable>
+          {groupedTasks.map((group: TaskGroup) => (
+            <View key={group.tagId} style={styles.groupSection}>
+              <View style={styles.groupHeader}>
+                {group.tag ? (
+                  <TagPill label={group.tag.name} color={group.tag.color} />
+                ) : (
+                  <Text style={styles.groupFallbackLabel}>Ohne Tag</Text>
+                )}
+              </View>
+              {group.tasks.map((task) => (
+                <Pressable
+                  key={task.id}
+                  onPress={async () => {
+                    await onSelectTask(task.id);
+                    setTaskModalVisible(false);
+                  }}
+                  style={styles.modalRow}
+                >
+                  <Text style={styles.modalTitle}>{task.title}</Text>
+                  <Text style={styles.modalMeta}>
+                    {task.date ? `${task.date} · ` : ''}
+                    {task.isCompleted ? 'Erledigt' : 'Offen'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           ))}
           {availableTasks.length === 0 ? (
             <Text style={styles.emptyCopy}>Keine Aufgaben verfügbar.</Text>
@@ -147,6 +217,24 @@ const styles = StyleSheet.create({
   },
   modalList: {
     maxHeight: 320,
+  },
+  groupSection: {
+    marginBottom: spacing.lg,
+  },
+  groupHeader: {
+    marginBottom: spacing.sm,
+  },
+  groupFallbackLabel: {
+    alignSelf: 'flex-start',
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
   },
   modalRow: {
     paddingVertical: spacing.md,

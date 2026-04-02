@@ -2,6 +2,8 @@ import { create } from 'zustand';
 
 import { GENERAL_TAG_ID } from '../constants/config';
 import { createSession } from '../db/repositories/sessionsRepository';
+import { getDailyFocusGoalNotifiedDate, saveDailyFocusGoalNotifiedDate } from '../db/repositories/settingsRepository';
+import { notificationService } from '../services/notifications/notificationService';
 import { getTagById } from '../db/repositories/tagsRepository';
 import { getTaskById } from '../db/repositories/tasksRepository';
 import { getTimerState, saveTimerState } from '../db/repositories/timerStateRepository';
@@ -14,8 +16,9 @@ import {
 } from '../services/timer/timerResume';
 import { timerEngine } from '../services/timer/timerEngine';
 import { TimerMode, TimerStateRecord } from '../types/timer';
-import { toLocalIsoString } from '../utils/date';
+import { getTodayDateKey, toLocalIsoString } from '../utils/date';
 import { useSessionsStore } from './sessionsStore';
+import { useSettingsStore } from './settingsStore';
 import { useSyncStore } from './syncStore';
 
 type TimerStateShape = Omit<TimerStateRecord, 'updatedAt'>;
@@ -54,6 +57,65 @@ const swallowSyncError = async (work: Promise<void>): Promise<void> => {
   } catch {
     // Sync failures are stored in the queue.
   }
+};
+
+const syncTimerCompletionNotification = async (
+  mode: TimerMode,
+  remainingSeconds: number,
+): Promise<void> => {
+  const preferences = useSettingsStore.getState().notificationPreferences;
+  const shouldNotify =
+    (mode === 'focus' && preferences.notifyOnFocusEnd) ||
+    (mode !== 'focus' && preferences.notifyOnBreakEnd);
+
+  if (!shouldNotify) {
+    await notificationService.cancelTimerCompletionNotification();
+    return;
+  }
+
+  const granted = await notificationService.getPermissionStatus();
+  if (!granted) {
+    return;
+  }
+
+  await notificationService.scheduleTimerCompletionNotification(mode, remainingSeconds);
+};
+
+const maybeNotifyDailyFocusGoalReached = async (sessionDurationMinutes: number): Promise<void> => {
+  const preferences = useSettingsStore.getState().notificationPreferences;
+  const targetHours = preferences.dailyFocusGoalHours;
+
+  if (!targetHours) {
+    return;
+  }
+
+  const todayKey = getTodayDateKey();
+  const lastNotifiedDate = await getDailyFocusGoalNotifiedDate();
+  if (lastNotifiedDate === todayKey) {
+    return;
+  }
+
+  const todaysMinutesBeforeCompletion = useSessionsStore
+    .getState()
+    .sessions.filter((session) => session.date === todayKey)
+    .reduce((total, session) => total + session.durationMinutes, 0);
+  const todaysMinutesAfterCompletion = todaysMinutesBeforeCompletion + sessionDurationMinutes;
+  const targetMinutes = targetHours * 60;
+
+  if (
+    todaysMinutesBeforeCompletion >= targetMinutes ||
+    todaysMinutesAfterCompletion < targetMinutes
+  ) {
+    return;
+  }
+
+  const granted = await notificationService.getPermissionStatus();
+  if (!granted) {
+    return;
+  }
+
+  await notificationService.sendDailyGoalReachedNotification(targetHours);
+  await saveDailyFocusGoalNotifiedDate(todayKey);
 };
 
 export const useTimerStore = create<TimerStoreState>((set, get) => ({
@@ -166,8 +228,13 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       return;
     }
 
-    const persisted = await saveTimerState(stripUpdatedAt(timerEngine.start(current)));
+    const nextState = timerEngine.start(current);
+    const persisted = await saveTimerState(stripUpdatedAt(nextState));
     set({ ...persisted });
+    await syncTimerCompletionNotification(
+      nextState.activeMode,
+      timerEngine.getRemainingSeconds(nextState),
+    );
   },
   pause: async () => {
     const current = get();
@@ -177,6 +244,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
 
     const persisted = await saveTimerState(stripUpdatedAt(timerEngine.pause(current)));
     set({ ...persisted });
+    await notificationService.cancelTimerCompletionNotification();
   },
   resume: async () => {
     const current = get();
@@ -184,12 +252,18 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       return;
     }
 
-    const persisted = await saveTimerState(stripUpdatedAt(timerEngine.resume(current)));
+    const nextState = timerEngine.resume(current);
+    const persisted = await saveTimerState(stripUpdatedAt(nextState));
     set({ ...persisted });
+    await syncTimerCompletionNotification(
+      nextState.activeMode,
+      timerEngine.getRemainingSeconds(nextState),
+    );
   },
   reset: async () => {
     const persisted = await saveTimerState(stripUpdatedAt(timerEngine.reset(get())));
     set({ ...persisted });
+    await notificationService.cancelTimerCompletionNotification();
   },
   finishNow: async () => {
     const current = get();
@@ -204,6 +278,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     const nextState = timerEngine.finishNow(current, now);
     set({ ...nextState });
     const persisted = await saveTimerState(stripUpdatedAt(nextState));
+    await notificationService.cancelTimerCompletionNotification();
 
     if (requestId !== completionRequestId) {
       return;
@@ -225,6 +300,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     }
 
     const createdSession = await createSession(sessionInput);
+    await maybeNotifyDailyFocusGoalReached(createdSession.durationMinutes);
     await useSessionsStore.getState().loadSessions();
     await swallowSyncError(syncManager.pushSession(toSessionPushPayload(createdSession)));
     await useSyncStore.getState().loadQueue();
@@ -238,9 +314,12 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
 
     const requestId = ++completionRequestId;
 
-    const completion = timerEngine.complete(current);
+    const completion = timerEngine.complete(current, {
+      autoSwitchToBreaks: useSettingsStore.getState().autoSwitchToBreaks,
+    });
     const nextState = completion.nextState;
     set({ ...nextState });
+    await notificationService.cancelTimerCompletionNotification();
 
     if (completion.completedMode === 'focus') {
       const task = current.selectedTaskId
@@ -263,6 +342,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       }
 
       const createdSession = await createSession(sessionInput);
+      await maybeNotifyDailyFocusGoalReached(createdSession.durationMinutes);
       await useSessionsStore.getState().loadSessions();
       await swallowSyncError(syncManager.pushSession(toSessionPushPayload(createdSession)));
       await useSyncStore.getState().loadQueue();

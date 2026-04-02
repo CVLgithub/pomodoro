@@ -91,6 +91,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="stats-chart" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="task/[id]" />
         <Stack.Screen name="tag/[id]" />

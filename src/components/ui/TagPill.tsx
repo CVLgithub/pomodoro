@@ -22,8 +22,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
-    borderRadius: radii.pill,
+    borderRadius: radii.sm,
     backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   dot: {
     width: 8,
@@ -36,4 +38,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

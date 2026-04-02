@@ -15,6 +15,7 @@ import { useSessionsStore } from '../../src/store/sessionsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
 import { useTimerStore } from '../../src/store/timerStore';
+import { formatTimeLabel } from '../../src/utils/date';
 
 export default function TimerScreen() {
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function TimerScreen() {
   return (
     <Screen
       title="Timer"
-      subtitle="Robuste Resume-Logik statt Background-Service."
+      subtitle="Starte den Pomodoro Timer."
       headerRight={<Button label="Settings" variant="ghost" onPress={() => router.push('/settings')} />}
     >
       <ModeTabs
@@ -71,7 +72,43 @@ export default function TimerScreen() {
         formattedRemaining={timer.formattedRemaining}
         progress={timer.progress}
       />
-
+<SectionCard>
+        <SectionHeader
+          title="Steuerung"
+          subtitle={
+            timer.activeMode === 'longBreak' && timer.status === 'idle'
+              ? 'Vier Fokus-Sessions abgeschlossen. Lange Pause ist bereit.'
+              : 'Pausen starten nie automatisch.'
+          }
+        />
+        <View style={{ gap: 12 }}>
+          {timer.status === 'idle' ? (
+            <Button label="Start" onPress={() => void runSafely(start, 'Timer konnte nicht gestartet werden')} />
+          ) : null}
+          {timer.status === 'running' ? (
+            <Button
+              label="Pause"
+              variant="secondary"
+              onPress={() => void runSafely(pause, 'Timer konnte nicht pausiert werden')}
+            />
+          ) : null}
+          {timer.status === 'paused' ? (
+            <Button label="Weiter" onPress={() => void runSafely(resume, 'Timer konnte nicht fortgesetzt werden')} />
+          ) : null}
+          {timer.status !== 'idle' ? (
+            <Button
+              label="Jetzt beenden"
+              variant="danger"
+              onPress={() => void runSafely(finishNow, 'Timer konnte nicht beendet werden')}
+            />
+          ) : null}
+          <Button
+            label="Reset"
+            variant="ghost"
+            onPress={() => void runSafely(reset, 'Timer konnte nicht zurückgesetzt werden')}
+          />
+        </View>
+      </SectionCard>
       <TaskAssignmentCard
         title="Aktuelle Zuordnung"
         tasks={tasks}
@@ -112,47 +149,12 @@ export default function TimerScreen() {
         </View>
       </SectionCard>
 
-      <SectionCard>
-        <SectionHeader
-          title="Steuerung"
-          subtitle={
-            timer.activeMode === 'longBreak' && timer.status === 'idle'
-              ? 'Vier Fokus-Sessions abgeschlossen. Lange Pause ist bereit.'
-              : 'Pausen starten nie automatisch.'
-          }
-        />
-        <View style={{ gap: 12 }}>
-          {timer.status === 'idle' ? (
-            <Button label="Start" onPress={() => void runSafely(start, 'Timer konnte nicht gestartet werden')} />
-          ) : null}
-          {timer.status === 'running' ? (
-            <Button
-              label="Pause"
-              variant="secondary"
-              onPress={() => void runSafely(pause, 'Timer konnte nicht pausiert werden')}
-            />
-          ) : null}
-          {timer.status === 'paused' ? (
-            <Button label="Weiter" onPress={() => void runSafely(resume, 'Timer konnte nicht fortgesetzt werden')} />
-          ) : null}
-          {timer.status !== 'idle' ? (
-            <Button
-              label="Jetzt beenden"
-              variant="danger"
-              onPress={() => void runSafely(finishNow, 'Timer konnte nicht beendet werden')}
-            />
-          ) : null}
-          <Button
-            label="Reset"
-            variant="ghost"
-            onPress={() => void runSafely(reset, 'Timer konnte nicht zurückgesetzt werden')}
-          />
-        </View>
-      </SectionCard>
+      
 
       {latestSession ? (
         <TaskAssignmentCard
           title="Letzte Fokus-Session"
+          subtitle={`${formatTimeLabel(latestSession.startTime)} - ${formatTimeLabel(latestSession.endTime)}`}
           tasks={tasks}
           tags={tags}
           selectedTaskId={latestSession.taskId}

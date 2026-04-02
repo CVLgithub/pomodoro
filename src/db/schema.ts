@@ -1,9 +1,11 @@
 import {
   DEFAULT_TIMER_DURATIONS,
   DEFAULT_BACKEND_URL,
+  DEFAULT_AUTO_SWITCH_TO_BREAKS,
   GENERAL_TAG_ID,
   GENERAL_TAG_NAME,
 } from '../constants/config';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '../constants/notifications';
 import { toLocalIsoString } from '../utils/date';
 
 export const buildSchemaStatements = (): string[] => {
@@ -98,6 +100,22 @@ export const buildSchemaStatements = (): string[] => {
     `
       INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
       VALUES ('backendUrl', '${DEFAULT_BACKEND_URL}', '${now}');
+    `,
+    `
+      INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+      VALUES ('notifyOnFocusEnd', '${String(DEFAULT_NOTIFICATION_PREFERENCES.notifyOnFocusEnd)}', '${now}');
+    `,
+    `
+      INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+      VALUES ('notifyOnBreakEnd', '${String(DEFAULT_NOTIFICATION_PREFERENCES.notifyOnBreakEnd)}', '${now}');
+    `,
+    `
+      INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+      VALUES ('dailyFocusGoalHours', 'off', '${now}');
+    `,
+    `
+      INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+      VALUES ('autoSwitchToBreaks', '${String(DEFAULT_AUTO_SWITCH_TO_BREAKS)}', '${now}');
     `,
     `
       INSERT OR IGNORE INTO tags (id, name, color, createdAt, updatedAt)

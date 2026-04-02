@@ -16,3 +16,4 @@ export const DEFAULT_TIMER_DURATIONS: TimerDurations = {
 };
 
 export const FOCUS_CYCLE_LENGTH = 4;
+export const DEFAULT_AUTO_SWITCH_TO_BREAKS = true;

@@ -36,7 +36,7 @@ export default function TasksScreen() {
   return (
     <Screen
       title="Aufgaben"
-      subtitle="Offen und erledigt klar getrennt, gruppiert nach Tags."
+      subtitle="Noch offene und bereits erledigte Aufgaben."
       headerRight={<Button label="Neu" variant="ghost" onPress={() => router.push('/task/new')} />}
     >
       {tasks.length === 0 ? (

@@ -136,17 +136,23 @@ export const timerEngine = {
   }),
   complete: (
     state: TimerStateRecord,
+    options?: {
+      autoSwitchToBreaks?: boolean;
+    },
     completedAt = new Date(),
   ): TimerCompletionResult => {
     const completedAtIso = state.expectedEndAt ?? toLocalIsoString(completedAt);
     const isFocus = state.activeMode === 'focus';
+    const autoSwitchToBreaks = options?.autoSwitchToBreaks ?? true;
     const completedFocusCount = isFocus
       ? (state.completedFocusCountInCycle + 1) % FOCUS_CYCLE_LENGTH
       : state.completedFocusCountInCycle;
     const nextMode: TimerMode = isFocus
-      ? completedFocusCount === 0
-        ? 'longBreak'
-        : 'shortBreak'
+      ? autoSwitchToBreaks
+        ? completedFocusCount === 0
+          ? 'longBreak'
+          : 'shortBreak'
+        : 'focus'
       : 'focus';
 
     return {

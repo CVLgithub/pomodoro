@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 import { DEFAULT_BACKEND_URL } from '../constants/config';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '../constants/notifications';
 import { toLocalIsoString } from '../utils/date';
 import { buildSchemaStatements } from './schema';
 
@@ -29,6 +30,27 @@ const migrations = [
         `
           INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
           VALUES ('backendUrl', '${DEFAULT_BACKEND_URL}', '${now}');
+        `,
+      ];
+    },
+  },
+  {
+    version: 3,
+    statements: () => {
+      const now = toLocalIsoString();
+
+      return [
+        `
+          INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+          VALUES ('notifyOnFocusEnd', '${String(DEFAULT_NOTIFICATION_PREFERENCES.notifyOnFocusEnd)}', '${now}');
+        `,
+        `
+          INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+          VALUES ('notifyOnBreakEnd', '${String(DEFAULT_NOTIFICATION_PREFERENCES.notifyOnBreakEnd)}', '${now}');
+        `,
+        `
+          INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+          VALUES ('dailyFocusGoalHours', 'off', '${now}');
         `,
       ];
     },

@@ -116,7 +116,7 @@ export default function StatsScreen() {
   return (
     <Screen
       title="Statistik"
-      subtitle="Fokus-Sessions lokal gruppiert und auswertbar."
+      subtitle="Detailierte Fokus Historie."
       headerRight={<Button label="Settings" variant="ghost" onPress={() => router.push('/settings')} />}
     >
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -124,6 +124,15 @@ export default function StatsScreen() {
         <StatSummaryCard label="Woche" value={formatMinutesShort(weekMinutes)} />
         <StatSummaryCard label="Monat" value={formatMinutesShort(monthMinutes)} />
       </View>
+
+      <SectionCard>
+        <View style={styles.chartCard}>
+          <View style={styles.chartCardText}>
+            <Text style={styles.chartCardTitle}>Grafische Statistik</Text>
+          </View>
+          <Button label="Diagramm" onPress={() => router.push('/stats-chart')} />
+        </View>
+      </SectionCard>
 
       {sortedDates.length === 0 ? (
         <EmptyState
@@ -279,5 +288,21 @@ const styles = StyleSheet.create({
   },
   modalRow: {
     paddingVertical: spacing.sm,
+  },
+  chartCard: {
+    gap: spacing.md,
+  },
+  chartCardText: {
+    gap: spacing.xs,
+  },
+  chartCardTitle: {
+    color: colors.textPrimary,
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  chartCardBody: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
