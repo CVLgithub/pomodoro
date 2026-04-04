@@ -11,18 +11,70 @@ import { SectionCard } from '../src/components/ui/SectionCard';
 import { SectionHeader } from '../src/components/ui/SectionHeader';
 import { TagPill } from '../src/components/ui/TagPill';
 import { TextField } from '../src/components/ui/TextField';
-import { DEFAULT_BACKEND_URL, GENERAL_TAG_ID } from '../src/constants/config';
+import { DEFAULT_BACKEND_URL, FREE_SESSION_TITLE, GENERAL_TAG_ID } from '../src/constants/config';
 import { colors } from '../src/constants/colors';
 import { spacing } from '../src/constants/spacing';
 import { timerEngine } from '../src/services/timer/timerEngine';
 import { notificationService } from '../src/services/notifications/notificationService';
+import { useSessionsStore } from '../src/store/sessionsStore';
 import { useSettingsStore } from '../src/store/settingsStore';
 import { useSyncStore } from '../src/store/syncStore';
 import { useTagsStore } from '../src/store/tagsStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { NotificationPreferences } from '../src/types/notifications';
+import { addMinutes, formatDateKey, formatTimeLabel, toLocalIsoString } from '../src/utils/date';
 
 const normalizeBackendUrl = (value: string): string => value.trim().replace(/\/+$/, '');
+const DATE_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_INPUT_PATTERN = /^\d{2}:\d{2}$/;
+
+const createLocalDate = (dateInput: string, timeInput: string): Date | null => {
+  if (!DATE_INPUT_PATTERN.test(dateInput) || !TIME_INPUT_PATTERN.test(timeInput)) {
+    return null;
+  }
+
+  const [year, month, day] = dateInput.split('-').map(Number);
+  const [hours, minutes] = timeInput.split(':').map(Number);
+
+  if (
+    [year, month, day, hours, minutes].some((value) => Number.isNaN(value)) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hours ||
+    date.getMinutes() !== minutes
+  ) {
+    return null;
+  }
+
+  return date;
+};
+
+const getManualSessionDefaults = () => {
+  const now = new Date();
+  return {
+    title: FREE_SESSION_TITLE,
+    date: formatDateKey(now),
+    startTime: formatTimeLabel(addMinutes(now, -25)),
+    endTime: formatTimeLabel(now),
+    tagId: GENERAL_TAG_ID,
+  };
+};
 
 const NotificationToggleRow = ({
   label,
@@ -163,10 +215,13 @@ export default function SettingsScreen() {
   const saveBackendUrl = useSettingsStore((state) => state.saveBackendUrl);
   const saveNotificationPreferences = useSettingsStore((state) => state.saveNotificationPreferences);
   const saveAutoSwitchToBreaks = useSettingsStore((state) => state.saveAutoSwitchToBreaks);
+  const createSessionEntry = useSessionsStore((state) => state.createSessionEntry);
 
   const [backendUrlInput, setBackendUrlInput] = useState(backendUrl);
   const [isSavingBackendUrl, setIsSavingBackendUrl] = useState(false);
   const [notificationsGranted, setNotificationsGranted] = useState(false);
+  const [manualSessionDraft, setManualSessionDraft] = useState(getManualSessionDefaults);
+  const [isSavingManualSession, setIsSavingManualSession] = useState(false);
 
   useEffect(() => {
     setBackendUrlInput(backendUrl);
@@ -217,6 +272,63 @@ export default function SettingsScreen() {
       );
     } finally {
       setIsSavingBackendUrl(false);
+    }
+  };
+
+  const handleAddManualSession = async () => {
+    const title = manualSessionDraft.title.trim();
+    const startDate = createLocalDate(manualSessionDraft.date, manualSessionDraft.startTime);
+    const endDate = createLocalDate(manualSessionDraft.date, manualSessionDraft.endTime);
+    const now = new Date();
+
+    if (!title) {
+      Alert.alert('Session konnte nicht gespeichert werden', 'Bitte gib einen Namen fur die Session ein.');
+      return;
+    }
+
+    if (!startDate || !endDate) {
+      Alert.alert(
+        'Session konnte nicht gespeichert werden',
+        'Bitte nutze das Format YYYY-MM-DD fur das Datum und HH:MM fur die Uhrzeiten.',
+      );
+      return;
+    }
+
+    if (endDate <= startDate) {
+      Alert.alert(
+        'Session konnte nicht gespeichert werden',
+        'Die Endzeit muss nach der Startzeit liegen.',
+      );
+      return;
+    }
+
+    if (endDate > now) {
+      Alert.alert(
+        'Session konnte nicht gespeichert werden',
+        'Es konnen nur vergangene Sessions manuell hinzugefugt werden.',
+      );
+      return;
+    }
+
+    setIsSavingManualSession(true);
+
+    try {
+      await createSessionEntry({
+        title,
+        date: manualSessionDraft.date,
+        startTime: toLocalIsoString(startDate),
+        endTime: toLocalIsoString(endDate),
+        tagId: manualSessionDraft.tagId,
+      });
+      setManualSessionDraft(getManualSessionDefaults());
+      Alert.alert('Session gespeichert', 'Die vergangene Session wurde hinzugefugt.');
+    } catch (error) {
+      Alert.alert(
+        'Session konnte nicht gespeichert werden',
+        error instanceof Error ? error.message : 'Unbekannter Fehler',
+      );
+    } finally {
+      setIsSavingManualSession(false);
     }
   };
 
@@ -359,6 +471,111 @@ export default function SettingsScreen() {
 
       <SectionCard>
         <SectionHeader
+          title="Vergangene Session"
+          subtitle="Erfasst eine bereits abgeschlossene Fokus-Session manuell."
+        />
+        <TextField
+          label="Name"
+          value={manualSessionDraft.title}
+          onChangeText={(value) =>
+            setManualSessionDraft((current) => ({
+              ...current,
+              title: value,
+            }))
+          }
+          placeholder="Was hast du gemacht?"
+          helperText="Der Eintrag erscheint in Statistik und Verlauf wie eine normale Session."
+        />
+        <View style={styles.manualSessionRow}>
+          <View style={styles.manualSessionField}>
+            <TextField
+              label="Datum"
+              value={manualSessionDraft.date}
+              onChangeText={(value) =>
+                setManualSessionDraft((current) => ({
+                  ...current,
+                  date: value,
+                }))
+              }
+              placeholder="2026-04-04"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={styles.manualSessionField}>
+            <TextField
+              label="Start"
+              value={manualSessionDraft.startTime}
+              onChangeText={(value) =>
+                setManualSessionDraft((current) => ({
+                  ...current,
+                  startTime: value,
+                }))
+              }
+              placeholder="09:00"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={styles.manualSessionField}>
+            <TextField
+              label="Ende"
+              value={manualSessionDraft.endTime}
+              onChangeText={(value) =>
+                setManualSessionDraft((current) => ({
+                  ...current,
+                  endTime: value,
+                }))
+              }
+              placeholder="09:25"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        </View>
+        <View style={styles.manualSessionTags}>
+          <Text style={styles.preferenceLabel}>Tag</Text>
+          <View style={styles.tagOptions}>
+            {tags.map((tag) => {
+              const isSelected = manualSessionDraft.tagId === tag.id;
+
+              return (
+                <Pressable
+                  key={tag.id}
+                  onPress={() =>
+                    setManualSessionDraft((current) => ({
+                      ...current,
+                      tagId: tag.id,
+                    }))
+                  }
+                  style={[
+                    styles.tagOption,
+                    isSelected ? styles.tagOptionSelected : null,
+                  ]}
+                >
+                  <TagPill label={tag.name} color={tag.color} />
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+        <View style={styles.actionRow}>
+          <Button
+            label="Session hinzufugen"
+            onPress={() => void handleAddManualSession()}
+            disabled={isSavingManualSession}
+          />
+          <Button
+            label="Zurucksetzen"
+            variant="secondary"
+            onPress={() => setManualSessionDraft(getManualSessionDefaults())}
+            disabled={isSavingManualSession}
+          />
+        </View>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionHeader
           title="Sync-Queue"
           subtitle="Fehlgeschlagene Pushes bleiben lokal sichtbar."
           action={
@@ -401,6 +618,31 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  manualSessionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  manualSessionField: {
+    flex: 1,
+  },
+  manualSessionTags: {
+    gap: spacing.sm,
+  },
+  tagOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  tagOption: {
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: 999,
+    padding: 2,
+  },
+  tagOptionSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
   },
   preferenceRow: {
     flexDirection: 'row',
