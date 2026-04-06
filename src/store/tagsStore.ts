@@ -104,8 +104,8 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
       useTimerStore.getState().handleDeletedTag(id),
     ]);
 
-    await swallowSyncError(syncManager.pushTag(id, createTagDeletePayload(id)));
     await syncReassignedEntities(result);
+    await swallowSyncError(syncManager.pushTag(id, createTagDeletePayload(id)));
     await useSyncStore.getState().loadQueue();
   },
 }));

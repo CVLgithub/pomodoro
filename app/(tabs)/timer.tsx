@@ -120,7 +120,7 @@ export default function TimerScreen() {
       />
 
       <SectionCard>
-        <SectionHeader title="Dauer" subtitle="iOS-naher Wheel-Picker für V1" />
+        <SectionHeader title="Dauer" subtitle="Stelle die Zeiten ein." />
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <DurationWheelPicker
             label="Fokus"

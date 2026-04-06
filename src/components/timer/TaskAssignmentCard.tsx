@@ -28,6 +28,54 @@ type TaskGroup = {
   tasks: Task[];
 };
 
+const sortTasks = (left: Task, right: Task) => {
+  if (left.date && right.date && left.date !== right.date) {
+    return left.date.localeCompare(right.date);
+  }
+
+  if (left.date && !right.date) {
+    return -1;
+  }
+
+  if (!left.date && right.date) {
+    return 1;
+  }
+
+  return left.title.localeCompare(right.title, 'de-DE');
+};
+
+const groupTasksByTag = (tasks: Task[], tags: Tag[]) => {
+  const tagById = new Map(tags.map((tag) => [tag.id, tag]));
+  const groups = tasks.reduce((result, task) => {
+    const entries = result.get(task.tagId) ?? [];
+    entries.push(task);
+    result.set(task.tagId, entries);
+    return result;
+  }, new Map<string, Task[]>());
+
+  return Array.from(groups.entries())
+    .map(([tagId, tagTasks]) => ({
+      tagId,
+      tag: tagById.get(tagId) ?? null,
+      tasks: [...tagTasks].sort(sortTasks),
+    }))
+    .sort((left, right) => {
+      if (left.tag && right.tag) {
+        return left.tag.name.localeCompare(right.tag.name, 'de-DE');
+      }
+
+      if (left.tag) {
+        return -1;
+      }
+
+      if (right.tag) {
+        return 1;
+      }
+
+      return 0;
+    });
+};
+
 export const TaskAssignmentCard = ({
   title,
   subtitle,
@@ -50,61 +98,14 @@ export const TaskAssignmentCard = ({
     () => tags.find((tag) => tag.id === activeTagId) ?? null,
     [activeTagId, tags],
   );
-  const availableTasks = useMemo(
-    () =>
-      [...tasks].sort((left, right) => {
-        const completionSort = Number(left.isCompleted) - Number(right.isCompleted);
-        if (completionSort !== 0) {
-          return completionSort;
-        }
-
-        if (left.date && right.date && left.date !== right.date) {
-          return left.date.localeCompare(right.date);
-        }
-
-        if (left.date && !right.date) {
-          return -1;
-        }
-
-        if (!left.date && right.date) {
-          return 1;
-        }
-
-        return left.title.localeCompare(right.title, 'de-DE');
-      }),
-    [tasks],
+  const openTaskGroups = useMemo(
+    () => groupTasksByTag(tasks.filter((task) => !task.isCompleted), tags),
+    [tasks, tags],
   );
-  const groupedTasks = useMemo(() => {
-    const tagById = new Map(tags.map((tag) => [tag.id, tag]));
-    const groups = availableTasks.reduce((result, task) => {
-      const entries = result.get(task.tagId) ?? [];
-      entries.push(task);
-      result.set(task.tagId, entries);
-      return result;
-    }, new Map<string, Task[]>());
-
-    return Array.from(groups.entries())
-      .map(([tagId, tagTasks]) => ({
-        tagId,
-        tag: tagById.get(tagId) ?? null,
-        tasks: tagTasks,
-      }))
-      .sort((left, right) => {
-        if (left.tag && right.tag) {
-          return left.tag.name.localeCompare(right.tag.name, 'de-DE');
-        }
-
-        if (left.tag) {
-          return -1;
-        }
-
-        if (right.tag) {
-          return 1;
-        }
-
-        return 0;
-      });
-  }, [availableTasks, tags]);
+  const completedTaskGroups = useMemo(
+    () => groupTasksByTag(tasks.filter((task) => task.isCompleted), tags),
+    [tasks, tags],
+  );
 
   return (
     <SectionCard>
@@ -137,36 +138,74 @@ export const TaskAssignmentCard = ({
         onClose={() => setTaskModalVisible(false)}
       >
         <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-          {groupedTasks.map((group: TaskGroup) => (
-            <View key={group.tagId} style={styles.groupSection}>
-              <View style={styles.groupHeader}>
-                {group.tag ? (
-                  <TagPill label={group.tag.name} color={group.tag.color} />
-                ) : (
-                  <Text style={styles.groupFallbackLabel}>Ohne Tag</Text>
-                )}
+          {openTaskGroups.length > 0 ? (
+            <View style={[styles.statusSection, styles.openSection]}>
+              <View style={styles.statusSectionHeader}>
+                <Text style={styles.statusHeading}>Offene Aufgaben</Text>
               </View>
-              {group.tasks.map((task) => (
-                <Pressable
-                  key={task.id}
-                  onPress={async () => {
-                    await onSelectTask(task.id);
-                    setTaskModalVisible(false);
-                  }}
-                  style={styles.modalRow}
-                >
-                  <Text style={styles.modalTitle}>{task.title}</Text>
-                  <Text style={styles.modalMeta}>
-                    {task.date ? `${task.date} · ` : ''}
-                    {task.isCompleted ? 'Erledigt' : 'Offen'}
-                  </Text>
-                </Pressable>
+              {openTaskGroups.map((group: TaskGroup) => (
+                <View key={`${group.tagId}-open`} style={styles.groupSection}>
+                  <View style={styles.groupHeader}>
+                    {group.tag ? (
+                      <TagPill label={group.tag.name} color={group.tag.color} />
+                    ) : (
+                      <Text style={styles.groupFallbackLabel}>Ohne Tag</Text>
+                    )}
+                  </View>
+                  {group.tasks.map((task) => (
+                    <Pressable
+                      key={task.id}
+                      onPress={async () => {
+                        await onSelectTask(task.id);
+                        setTaskModalVisible(false);
+                      }}
+                      style={styles.modalRow}
+                    >
+                      <Text style={styles.modalTitle}>{task.title}</Text>
+                      <Text style={styles.modalMeta}>{task.date ? task.date : 'Ohne Datum'}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               ))}
             </View>
-          ))}
-          {availableTasks.length === 0 ? (
-            <Text style={styles.emptyCopy}>Keine Aufgaben verfügbar.</Text>
           ) : null}
+
+          {completedTaskGroups.length > 0 ? (
+            <View style={[styles.statusSection, styles.completedSection]}>
+              <View style={styles.statusSectionHeader}>
+                <Text style={[styles.statusHeading, styles.completedHeading]}>Erledigte Aufgaben</Text>
+                <Text style={styles.completedDescription}>
+                  Abgeschlossene Aufgaben sind separat aufgeführt.
+                </Text>
+              </View>
+              {completedTaskGroups.map((group: TaskGroup) => (
+                <View key={`${group.tagId}-completed`} style={styles.groupSection}>
+                  <View style={styles.groupHeader}>
+                    {group.tag ? (
+                      <TagPill label={group.tag.name} color={group.tag.color} />
+                    ) : (
+                      <Text style={styles.groupFallbackLabel}>Ohne Tag</Text>
+                    )}
+                  </View>
+                  {group.tasks.map((task) => (
+                    <Pressable
+                      key={task.id}
+                      onPress={async () => {
+                        await onSelectTask(task.id);
+                        setTaskModalVisible(false);
+                      }}
+                      style={[styles.modalRow, styles.modalRowCompleted]}
+                    >
+                      <Text style={[styles.modalTitle, styles.modalTitleCompleted]}>{task.title}</Text>
+                      <Text style={styles.modalMeta}>{task.date ? task.date : 'Ohne Datum'}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {tasks.length === 0 ? <Text style={styles.emptyCopy}>Keine Aufgaben verfügbar.</Text> : null}
         </ScrollView>
       </ModalSheet>
 
@@ -218,11 +257,49 @@ const styles = StyleSheet.create({
   modalList: {
     maxHeight: 320,
   },
-  groupSection: {
+  statusSection: {
     marginBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  openSection: {
+    gap: spacing.lg,
+  },
+  completedSection: {
+    marginTop: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderColor: 'rgba(151, 163, 182, 0.35)',
+    backgroundColor: 'rgba(21, 27, 35, 0.92)',
+  },
+  statusSectionHeader: {
+    gap: spacing.xs,
+  },
+  statusEyebrow: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+  },
+  completedHeading: {
+    color: colors.success,
+  },
+  statusHeading: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  completedDescription: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  groupSection: {
+    gap: spacing.sm,
   },
   groupHeader: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   groupFallbackLabel: {
     alignSelf: 'flex-start',
@@ -242,10 +319,21 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: spacing.xs,
   },
+  modalRowCompleted: {
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: 'rgba(70, 195, 123, 0.16)',
+    backgroundColor: colors.surface,
+  },
   modalTitle: {
     color: colors.textPrimary,
     fontSize: 16,
     fontWeight: '500',
+  },
+  modalTitleCompleted: {
+    color: colors.textSecondary,
+    textDecorationLine: 'line-through',
   },
   modalMeta: {
     color: colors.textMuted,

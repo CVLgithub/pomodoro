@@ -138,12 +138,12 @@ const NotificationSettingsCard = memo(function NotificationSettingsCard({
     <SectionCard>
       <SectionHeader
         title="Benachrichtigungen"
-        subtitle="Steuert Erinnerungen fur Sessionende, Pausenende und Tagesziele."
+        subtitle="Steuert Erinnerungen für Sessionende, Pausenende und Tagesziele."
       />
       {!notificationsSupported ? (
         <Text style={styles.warningText}>
-          `expo-notifications` ist noch nicht installiert. Fuhre `npx expo install
-          expo-notifications` aus, damit System-Benachrichtigungen verfugbar sind.
+          `expo-notifications` ist noch nicht installiert. Führe `npx expo install
+          expo-notifications` aus, damit System-Benachrichtigungen verfügbar sind.
         </Text>
       ) : null}
       <NotificationToggleRow
@@ -171,7 +171,7 @@ const NotificationSettingsCard = memo(function NotificationSettingsCard({
       <View style={styles.goalSection}>
         <Text style={styles.preferenceLabel}>Tagesziel</Text>
         <Text style={styles.preferenceDescription}>
-          Benachrichtigt dich, sobald du an einem Tag die gewahlte Fokuszeit erreicht hast.
+          Benachrichtigt dich, sobald du an einem Tag die gewählte Fokuszeit erreicht hast.
         </Text>
         <View style={styles.goalOptions}>
           <Button
@@ -282,14 +282,14 @@ export default function SettingsScreen() {
     const now = new Date();
 
     if (!title) {
-      Alert.alert('Session konnte nicht gespeichert werden', 'Bitte gib einen Namen fur die Session ein.');
+      Alert.alert('Session konnte nicht gespeichert werden', 'Bitte gib einen Namen für die Session ein.');
       return;
     }
 
     if (!startDate || !endDate) {
       Alert.alert(
         'Session konnte nicht gespeichert werden',
-        'Bitte nutze das Format YYYY-MM-DD fur das Datum und HH:MM fur die Uhrzeiten.',
+        'Bitte nutze das Format YYYY-MM-DD für das Datum und HH:MM für die Uhrzeiten.',
       );
       return;
     }
@@ -305,7 +305,7 @@ export default function SettingsScreen() {
     if (endDate > now) {
       Alert.alert(
         'Session konnte nicht gespeichert werden',
-        'Es konnen nur vergangene Sessions manuell hinzugefugt werden.',
+        'Es können nur vergangene Sessions manuell hinzugefügt werden.',
       );
       return;
     }
@@ -386,10 +386,10 @@ export default function SettingsScreen() {
     <Screen
       title="Settings"
       subtitle="Lokale Quelle, Push-only Synchronisierung."
-      headerRight={<Button label="SchlieBen" variant="ghost" onPress={() => router.back()} />}
+      headerRight={<Button label="Schließen" variant="ghost" onPress={() => router.back()} />}
     >
       <SectionCard>
-        <SectionHeader title="Backend" subtitle="Zentrale Konfiguration fur Push-Requests" />
+        <SectionHeader title="Backend" subtitle="Zentrale Konfiguration für Push-Requests" />
         <TextField
           label="Backend-URL"
           value={backendUrlInput}
@@ -398,7 +398,7 @@ export default function SettingsScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
-          helperText="Die URL wird fur alle neuen Push-Requests verwendet."
+          helperText="Die URL wird für alle neuen Push-Requests verwendet."
         />
         <View style={styles.actionRow}>
           <Button
@@ -444,7 +444,7 @@ export default function SettingsScreen() {
       <SectionCard>
         <SectionHeader
           title="Tags"
-          subtitle="Allgemein bleibt geschutzt, weitere Tags sind editierbar."
+          subtitle="Allgemein bleibt geschützt, weitere Tags sind editierbar."
           action={<Button label="Neu" variant="secondary" onPress={() => router.push('/tag/new')} />}
         />
         {tags.length <= 1 ? (
@@ -561,12 +561,12 @@ export default function SettingsScreen() {
         </View>
         <View style={styles.actionRow}>
           <Button
-            label="Session hinzufugen"
+            label="Session hinzufügen"
             onPress={() => void handleAddManualSession()}
             disabled={isSavingManualSession}
           />
           <Button
-            label="Zurucksetzen"
+            label="Zurücksetzen"
             variant="secondary"
             onPress={() => setManualSessionDraft(getManualSessionDefaults())}
             disabled={isSavingManualSession}
@@ -588,7 +588,7 @@ export default function SettingsScreen() {
         />
         {queueItems.length === 0 ? (
           <EmptyState
-            title="Keine Queue-Eintrage"
+            title="Keine Queue-Einträge"
             description="Sobald Requests gesendet werden, erscheinen Status und Payload hier."
           />
         ) : (

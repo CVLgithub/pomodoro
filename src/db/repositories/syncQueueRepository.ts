@@ -34,6 +34,26 @@ export const getSyncQueueItemById = async (id: string): Promise<SyncQueueItem | 
   return row ? mapRow(row) : null;
 };
 
+export const getLatestSyncQueueItemForEntity = async (
+  entityType: SyncQueueItem['entityType'],
+  entityId: string,
+): Promise<SyncQueueItem | null> => {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<SyncQueueRow>(
+    `
+      SELECT id, entityType, entityId, endpoint, method, payloadJson, status, errorMessage, retryCount, createdAt, updatedAt
+      FROM sync_queue
+      WHERE entityType = ? AND entityId = ?
+      ORDER BY createdAt DESC, updatedAt DESC
+      LIMIT 1;
+    `,
+    entityType,
+    entityId,
+  );
+
+  return row ? mapRow(row) : null;
+};
+
 export const createSyncQueueItem = async (
   input: CreateSyncQueueItemInput,
 ): Promise<SyncQueueItem> => {
@@ -76,6 +96,11 @@ export const createSyncQueueItem = async (
   return item;
 };
 
+export const deleteSyncQueueItem = async (id: string): Promise<void> => {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM sync_queue WHERE id = ?;', id);
+};
+
 export const updateSyncQueueItemStatus = async (
   id: string,
   status: SyncStatus,
@@ -106,6 +131,18 @@ export const deleteSyncQueueItemsByEntity = async (
   const db = await getDatabase();
   await db.runAsync(
     'DELETE FROM sync_queue WHERE entityType = ? AND entityId = ?;',
+    entityType,
+    entityId,
+  );
+};
+
+export const deleteUnsyncedSyncQueueItemsByEntity = async (
+  entityType: SyncQueueItem['entityType'],
+  entityId: string,
+): Promise<void> => {
+  const db = await getDatabase();
+  await db.runAsync(
+    "DELETE FROM sync_queue WHERE entityType = ? AND entityId = ? AND status != 'synced';",
     entityType,
     entityId,
   );

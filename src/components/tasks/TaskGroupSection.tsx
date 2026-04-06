@@ -13,6 +13,7 @@ interface TaskGroupSectionProps {
   tagsById: Record<string, Tag>;
   onToggleTask: (task: Task, nextValue: boolean) => void;
   onPressTask: (task: Task) => void;
+  variant?: 'default' | 'completed';
 }
 
 export const TaskGroupSection = ({
@@ -21,8 +22,9 @@ export const TaskGroupSection = ({
   tagsById,
   onToggleTask,
   onPressTask,
+  variant = 'default',
 }: TaskGroupSectionProps) => (
-  <SectionCard>
+  <SectionCard style={variant === 'completed' ? styles.completedCard : null}>
     <SectionHeader title={title} subtitle={`${tasks.length} Einträge`} />
     <View>
       {tasks.length === 0 ? (
@@ -35,6 +37,7 @@ export const TaskGroupSection = ({
             tag={tagsById[task.tagId]}
             onPress={() => onPressTask(task)}
             onToggle={(value) => onToggleTask(task, value)}
+            variant={variant}
           />
         ))
       )}
@@ -46,5 +49,9 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textSecondary,
     fontSize: 14,
+  },
+  completedCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: 'rgba(70, 195, 123, 0.22)',
   },
 });

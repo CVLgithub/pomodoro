@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
+import { Ionicon } from '../../src/components/ui/Ionicon';
 import { colors } from '../../src/constants/colors';
 
-const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
+const icons: Record<string, 'sunny-outline' | 'timer-outline' | 'calendar-outline' | 'list-outline' | 'bar-chart-outline'> = {
   today: 'sunny-outline',
   timer: 'timer-outline',
   calendar: 'calendar-outline',
@@ -23,7 +23,7 @@ export default function TabsLayout() {
           borderTopColor: colors.border,
         },
         tabBarIcon: ({ color, size }) => (
-          <Ionicons name={icons[route.name]} color={color} size={size} />
+          <Ionicon name={icons[route.name]} color={color} size={size} />
         ),
       })}
     >

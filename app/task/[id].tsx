@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
+import { TaskDateField } from '../../src/components/tasks/TaskDateField';
 import { Button } from '../../src/components/ui/Button';
 import { ModalSheet } from '../../src/components/ui/ModalSheet';
 import { Screen } from '../../src/components/ui/Screen';
@@ -15,7 +15,6 @@ import { colors } from '../../src/constants/colors';
 import { spacing } from '../../src/constants/spacing';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
-import { formatDateKey } from '../../src/utils/date';
 
 export default function TaskDetailScreen() {
   const router = useRouter();
@@ -62,15 +61,20 @@ export default function TaskDetailScreen() {
     }
 
     setIsSaving(true);
+
     try {
       if (isNew) {
         await createTask({ title, tagId: selectedTagId, date });
       } else if (task) {
         await updateTask(task.id, { title, tagId: selectedTagId, date, isCompleted });
       }
+
       router.back();
     } catch (error) {
-      Alert.alert('Speichern fehlgeschlagen', error instanceof Error ? error.message : 'Unbekannter Fehler');
+      Alert.alert(
+        'Speichern fehlgeschlagen',
+        error instanceof Error ? error.message : 'Unbekannter Fehler',
+      );
     } finally {
       setIsSaving(false);
     }
@@ -82,24 +86,32 @@ export default function TaskDetailScreen() {
       return;
     }
 
-    Alert.alert('Aufgabe löschen?', 'Diese Aktion entfernt die Aufgabe lokal und pusht ein Delete-Tombstone.', [
-      { text: 'Abbrechen', style: 'cancel' },
-      {
-        text: 'Löschen',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteTask(task.id);
-          router.replace('/(tabs)/tasks');
+    Alert.alert(
+      'Aufgabe löschen?',
+      'Diese Aktion entfernt die Aufgabe lokal und pusht ein Delete-Tombstone.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Löschen',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteTask(task.id);
+            router.replace('/(tabs)/tasks');
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   if (!isNew && !task) {
     return (
-      <Screen title="Aufgabe" subtitle="Eintrag nicht gefunden" headerRight={<Button label="Zurück" variant="ghost" onPress={() => router.back()} />}>
+      <Screen
+        title="Aufgabe"
+        subtitle="Eintrag nicht gefunden"
+        headerRight={<Button label="Zurück" variant="ghost" onPress={() => router.back()} />}
+      >
         <SectionCard>
-          <Text style={{ color: colors.textSecondary }}>Die angeforderte Aufgabe existiert nicht mehr.</Text>
+          <Text style={styles.missingCopy}>Die angeforderte Aufgabe existiert nicht mehr.</Text>
         </SectionCard>
       </Screen>
     );
@@ -113,7 +125,12 @@ export default function TaskDetailScreen() {
     >
       <SectionCard>
         <SectionHeader title="Details" />
-        <TextField label="Titel" value={title} onChangeText={setTitle} placeholder="Aufgabe benennen" />
+        <TextField
+          label="Titel"
+          value={title}
+          onChangeText={setTitle}
+          placeholder="Aufgabe benennen"
+        />
 
         <View style={styles.fieldBlock}>
           <Text style={styles.label}>Tag</Text>
@@ -123,30 +140,12 @@ export default function TaskDetailScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.fieldBlock}>
-          <Text style={styles.label}>Datum</Text>
-          <View style={styles.selector}>
-            <Text style={styles.value}>{date ?? 'Kein Datum gesetzt'}</Text>
-            <View style={styles.rowActions}>
-              <Button label="Ändern" variant="ghost" onPress={() => setShowDatePicker((value) => !value)} />
-              {date ? <Button label="Entfernen" variant="ghost" onPress={() => setDate(null)} /> : null}
-            </View>
-          </View>
-          {showDatePicker ? (
-            <DateTimePicker
-              value={date ? new Date(`${date}T12:00:00`) : new Date()}
-              mode="date"
-              display="spinner"
-              themeVariant="dark"
-              onChange={(_, selectedDate) => {
-                if (!selectedDate) {
-                  return;
-                }
-                setDate(formatDateKey(selectedDate));
-              }}
-            />
-          ) : null}
-        </View>
+        <TaskDateField
+          date={date}
+          isPickerVisible={showDatePicker}
+          onTogglePicker={() => setShowDatePicker((value) => !value)}
+          onChangeDate={setDate}
+        />
 
         {!isNew ? (
           <View style={styles.fieldBlock}>
@@ -164,12 +163,24 @@ export default function TaskDetailScreen() {
 
       <SectionCard>
         <View style={styles.rowActions}>
-          <Button label="Speichern" onPress={handleSave} disabled={!title.trim() || isSaving} />
-          <Button label={isNew ? 'Abbrechen' : 'Löschen'} variant={isNew ? 'ghost' : 'danger'} onPress={handleDelete} />
+          <Button
+            label="Speichern"
+            onPress={handleSave}
+            disabled={!title.trim() || isSaving}
+          />
+          <Button
+            label={isNew ? 'Abbrechen' : 'Löschen'}
+            variant={isNew ? 'ghost' : 'danger'}
+            onPress={handleDelete}
+          />
         </View>
       </SectionCard>
 
-      <ModalSheet visible={showTagPicker} title="Tag wählen" onClose={() => setShowTagPicker(false)}>
+      <ModalSheet
+        visible={showTagPicker}
+        title="Tag wählen"
+        onClose={() => setShowTagPicker(false)}
+      >
         <View style={styles.modalList}>
           {tags.map((tag) => (
             <Pressable
@@ -190,6 +201,9 @@ export default function TaskDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  missingCopy: {
+    color: colors.textSecondary,
+  },
   fieldBlock: {
     gap: spacing.sm,
   },
@@ -213,10 +227,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 14,
     fontWeight: '600',
-  },
-  value: {
-    color: colors.textPrimary,
-    fontSize: 15,
   },
   rowActions: {
     flexDirection: 'row',

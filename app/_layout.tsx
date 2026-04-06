@@ -1,13 +1,17 @@
 import 'react-native-gesture-handler';
 
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { colors } from '../src/constants/colors';
 import { initializeDatabase } from '../src/db/client';
 import { useAppResume } from '../src/hooks/useAppResume';
+import { downsyncEntries } from '../src/services/sync/downsyncService';
+import { getEntriesRequestUrl } from '../src/services/api/entriesService';
 import { useSessionsStore } from '../src/store/sessionsStore';
 import { useSettingsStore } from '../src/store/settingsStore';
 import { useSyncStore } from '../src/store/syncStore';
@@ -17,6 +21,7 @@ import { useTimerStore } from '../src/store/timerStore';
 import { useUiStore } from '../src/store/uiStore';
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts(Ionicons.font);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isBootstrapped = useUiStore((state) => state.isBootstrapped);
   const setBootstrapped = useUiStore((state) => state.setBootstrapped);
@@ -28,6 +33,17 @@ export default function RootLayout() {
       try {
         await initializeDatabase();
         await useSettingsStore.getState().loadSettings();
+        if (Platform.OS === 'web') {
+          try {
+            await downsyncEntries();
+          } catch (error) {
+            console.warn(
+              'Web downsync failed during bootstrap',
+              getEntriesRequestUrl(),
+              error instanceof Error ? error.message : error,
+            );
+          }
+        }
         await Promise.all([
           useTagsStore.getState().loadTags(),
           useTasksStore.getState().loadTasks(),
@@ -54,7 +70,27 @@ export default function RootLayout() {
     };
   }, [setBootstrapped]);
 
+  const startupErrorMessage =
+    errorMessage ??
+    (fontError instanceof Error
+      ? fontError.message
+      : fontError
+        ? 'Icon-Fonts konnten nicht geladen werden.'
+        : null);
+
   useAppResume(async () => {
+    if (Platform.OS === 'web') {
+      try {
+        await downsyncEntries();
+      } catch (error) {
+        console.warn(
+          'Web downsync failed on resume',
+          getEntriesRequestUrl(),
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
     await useTimerStore.getState().reconcileWithClock();
     await Promise.all([
       useSessionsStore.getState().loadSessions(),
@@ -64,16 +100,16 @@ export default function RootLayout() {
     ]);
   });
 
-  if (errorMessage) {
+  if (startupErrorMessage) {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorTitle}>Start fehlgeschlagen</Text>
-        <Text style={styles.errorBody}>{errorMessage}</Text>
+        <Text style={styles.errorBody}>{startupErrorMessage}</Text>
       </View>
     );
   }
 
-  if (!isBootstrapped) {
+  if (!fontsLoaded || !isBootstrapped) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator color={colors.accent} />

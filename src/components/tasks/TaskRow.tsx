@@ -1,10 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
 import { Tag } from '../../types/tag';
 import { Task } from '../../types/task';
+import { Ionicon } from '../ui/Ionicon';
 import { TagPill } from '../ui/TagPill';
 
 interface TaskRowProps {
@@ -12,10 +12,23 @@ interface TaskRowProps {
   tag: Tag | undefined;
   onPress: () => void;
   onToggle: (value: boolean) => void;
+  variant?: 'default' | 'completed';
 }
 
-export const TaskRow = ({ task, tag, onPress, onToggle }: TaskRowProps) => (
-  <Pressable style={styles.container} onPress={onPress}>
+export const TaskRow = ({
+  task,
+  tag,
+  onPress,
+  onToggle,
+  variant = 'default',
+}: TaskRowProps) => (
+  <Pressable
+    style={[
+      styles.container,
+      variant === 'completed' ? styles.containerCompleted : null,
+    ]}
+    onPress={onPress}
+  >
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked: task.isCompleted }}
@@ -29,11 +42,17 @@ export const TaskRow = ({ task, tag, onPress, onToggle }: TaskRowProps) => (
       ]}
     >
       {task.isCompleted ? (
-        <Ionicons name="checkmark" size={16} color={colors.background} />
+        <Ionicon name="checkmark" size={16} color={colors.background} />
       ) : null}
     </Pressable>
     <View style={styles.content}>
-      <Text style={[styles.title, task.isCompleted ? styles.titleCompleted : null]}>
+      <Text
+        style={[
+          styles.title,
+          task.isCompleted ? styles.titleCompleted : null,
+          variant === 'completed' ? styles.titleCompletedRow : null,
+        ]}
+      >
         {task.title}
       </Text>
       <View style={styles.meta}>
@@ -50,6 +69,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  containerCompleted: {
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(70, 195, 123, 0.18)',
+    opacity: 0.8,
   },
   checkbox: {
     width: 26,
@@ -77,6 +104,9 @@ const styles = StyleSheet.create({
   titleCompleted: {
     color: colors.textMuted,
     textDecorationLine: 'line-through',
+  },
+  titleCompletedRow: {
+    color: colors.textSecondary,
   },
   meta: {
     flexDirection: 'row',

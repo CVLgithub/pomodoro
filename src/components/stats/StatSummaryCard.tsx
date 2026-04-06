@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
@@ -6,10 +6,11 @@ import { radii, spacing } from '../../constants/spacing';
 interface StatSummaryCardProps {
   label: string;
   value: string;
+  style?: StyleProp<ViewStyle>;
 }
 
-export const StatSummaryCard = ({ label, value }: StatSummaryCardProps) => (
-  <View style={styles.card}>
+export const StatSummaryCard = ({ label, value, style }: StatSummaryCardProps) => (
+  <View style={[styles.card, style]}>
     <Text style={styles.label}>{label}</Text>
     <Text style={styles.value}>{value}</Text>
   </View>
@@ -37,4 +38,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

@@ -1,12 +1,16 @@
 import { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
 
-export const SectionCard = ({ children }: { children: ReactNode }) => (
-  <View style={styles.card}>{children}</View>
-);
+export const SectionCard = ({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) => <View style={[styles.card, style]}>{children}</View>;
 
 const styles = StyleSheet.create({
   card: {
@@ -18,4 +22,3 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
 });
-

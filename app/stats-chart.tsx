@@ -163,14 +163,17 @@ export default function StatsChartScreen() {
     };
   }, [monthAnchor, range, sessions, tags]);
 
+  const averageMinutesPerActiveDay =
+    chartData.activeDays > 0 ? Math.round(chartData.totalMinutes / chartData.activeDays) : 0;
+
   const barWidth = range === 'week' ? WEEK_BAR_WIDTH : MONTH_BAR_WIDTH;
   const monthLabel = monthLabelFormatter.format(monthAnchor);
 
   return (
     <Screen
       title="Statistik Diagramm"
-      subtitle="Tagesbalken nach Tags fuer die aktuelle Woche oder einen ausgewaehlten Monat."
-      headerRight={<Button label="Zurueck" variant="ghost" onPress={() => router.back()} />}
+      subtitle="Tagesbalken nach Tags für die aktuelle Woche oder einen ausgewählten Monat."
+      headerRight={<Button label="Zurück" variant="ghost" onPress={() => router.back()} />}
     >
       <SectionCard>
         <View style={styles.rangeHeader}>
@@ -210,7 +213,7 @@ export default function StatsChartScreen() {
               onPress={() => setMonthAnchor((current) => addMonths(current, -1))}
               style={styles.monthNavButton}
             >
-              <Text style={styles.monthNavButtonLabel}>Zurueck</Text>
+              <Text style={styles.monthNavButtonLabel}>Zurück</Text>
             </Pressable>
             <Text style={styles.monthLabel}>{monthLabel}</Text>
             <Pressable
@@ -235,12 +238,32 @@ export default function StatsChartScreen() {
       </SectionCard>
 
       <View style={styles.summaryGrid}>
-        <StatSummaryCard label="Gesamt" value={formatMinutesShort(chartData.totalMinutes)} />
-        <StatSummaryCard label="Aktive Tage" value={String(chartData.activeDays)} />
-        <StatSummaryCard
-          label="Max / Tag"
-          value={formatMinutesShort(chartData.maxMinutes)}
-        />
+        <View style={styles.summaryTopRow}>
+          <View style={styles.summaryWideCard}>
+            <StatSummaryCard label="Gesamt" value={formatMinutesShort(chartData.totalMinutes)} />
+          </View>
+          <View style={styles.summaryNarrowCard}>
+            <StatSummaryCard
+              label="Tage"
+              value={String(chartData.activeDays)}
+              style={styles.summaryCompactStatCard}
+            />
+          </View>
+        </View>
+        <View style={styles.summaryBottomRow}>
+          <View style={styles.summaryHalfCard}>
+            <StatSummaryCard
+              label="Durchschnitt"
+              value={formatMinutesShort(averageMinutesPerActiveDay)}
+            />
+          </View>
+          <View style={styles.summaryHalfCard}>
+            <StatSummaryCard
+              label="Max / Tag"
+              value={formatMinutesShort(chartData.maxMinutes)}
+            />
+          </View>
+        </View>
       </View>
 
       <SectionCard>
@@ -399,9 +422,31 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.md,
+  },
+  summaryTopRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  summaryBottomRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  summaryWideCard: {
+    flex: 3,
+    minWidth: 0,
+  },
+  summaryNarrowCard: {
+    flex: 1,
+    minWidth: 0,
+  },
+  summaryHalfCard: {
+    flex: 1,
+    minWidth: 0,
+  },
+  summaryCompactStatCard: {
+    minWidth: 0,
+    paddingHorizontal: spacing.md,
   },
   chartHeader: {
     flexDirection: 'row',

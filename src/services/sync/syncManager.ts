@@ -1,4 +1,12 @@
-import { createSyncQueueItem, getSyncQueueItemById, listSyncQueueItems, updateSyncQueueItemStatus } from '../../db/repositories/syncQueueRepository';
+import {
+  createSyncQueueItem,
+  deleteSyncQueueItem,
+  deleteUnsyncedSyncQueueItemsByEntity,
+  getLatestSyncQueueItemForEntity,
+  getSyncQueueItemById,
+  listSyncQueueItems,
+  updateSyncQueueItemStatus,
+} from '../../db/repositories/syncQueueRepository';
 import { updateSessionSyncStatus } from '../../db/repositories/sessionsRepository';
 import { PushSessionPayload, PushTagPayload, PushTaskPayload } from '../../types/api';
 import { SyncEntityType, SyncQueueItem } from '../../types/sync';
@@ -61,11 +69,22 @@ const normalizeSyncPayload = (
   };
 };
 
+const isQueueItemSuperseded = async (item: SyncQueueItem): Promise<boolean> => {
+  const latestItem = await getLatestSyncQueueItemForEntity(item.entityType, item.entityId);
+
+  return Boolean(latestItem && latestItem.id !== item.id);
+};
+
 const performSyncRequest = async (
   item: SyncQueueItem,
   payload: PushTaskPayload | PushTagPayload | PushSessionPayload,
   retryCount = item.retryCount,
 ): Promise<void> => {
+  if (await isQueueItemSuperseded(item)) {
+    await deleteSyncQueueItem(item.id);
+    return;
+  }
+
   const normalizedPayload = normalizeSyncPayload(item.entityType, payload);
 
   try {
@@ -97,6 +116,7 @@ const enqueueAndPush = async (
   payload: PushTaskPayload | PushTagPayload | PushSessionPayload,
 ): Promise<void> => {
   const normalizedPayload = normalizeSyncPayload(entityType, payload);
+  await deleteUnsyncedSyncQueueItemsByEntity(entityType, entityId);
   const queueItem = await createSyncQueueItem({
     entityType,
     entityId,
@@ -124,6 +144,11 @@ export const syncManager = {
       throw new Error('Sync queue item not found');
     }
 
+    if (await isQueueItemSuperseded(item)) {
+      await deleteSyncQueueItem(item.id);
+      return;
+    }
+
     const payload = JSON.parse(item.payloadJson) as
       | PushTaskPayload
       | PushTagPayload
@@ -133,7 +158,15 @@ export const syncManager = {
   },
   retryAllFailed: async (): Promise<void> => {
     const items = await listSyncQueueItems();
-    const retryableItems = items.filter((item) => item.status !== 'synced');
+    const retryableItems = items
+      .filter((item) => item.status !== 'synced')
+      .sort((left, right) => {
+        if (left.createdAt !== right.createdAt) {
+          return left.createdAt.localeCompare(right.createdAt);
+        }
+
+        return left.updatedAt.localeCompare(right.updatedAt);
+      });
 
     for (const item of retryableItems) {
       try {
