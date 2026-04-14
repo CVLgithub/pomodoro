@@ -13,7 +13,7 @@ import { TagPill } from '../src/components/ui/TagPill';
 import { TextField } from '../src/components/ui/TextField';
 import { DEFAULT_BACKEND_URL, FREE_SESSION_TITLE, GENERAL_TAG_ID } from '../src/constants/config';
 import { colors } from '../src/constants/colors';
-import { spacing } from '../src/constants/spacing';
+import { radii, spacing } from '../src/constants/spacing';
 import { timerEngine } from '../src/services/timer/timerEngine';
 import { notificationService } from '../src/services/notifications/notificationService';
 import { useSessionsStore } from '../src/store/sessionsStore';
@@ -222,6 +222,7 @@ export default function SettingsScreen() {
   const [notificationsGranted, setNotificationsGranted] = useState(false);
   const [manualSessionDraft, setManualSessionDraft] = useState(getManualSessionDefaults);
   const [isSavingManualSession, setIsSavingManualSession] = useState(false);
+  const [showCollapsedQueueItems, setShowCollapsedQueueItems] = useState(false);
 
   useEffect(() => {
     setBackendUrlInput(backendUrl);
@@ -250,6 +251,21 @@ export default function SettingsScreen() {
   const hasBackendUrlChanges = useMemo(
     () => normalizeBackendUrl(backendUrlInput) !== normalizeBackendUrl(backendUrl),
     [backendUrl, backendUrlInput],
+  );
+  const visibleQueueItems = useMemo(
+    () => queueItems.filter((item) => item.status === 'failed'),
+    [queueItems],
+  );
+  const collapsedQueueItems = useMemo(
+    () => queueItems.filter((item) => item.status !== 'failed'),
+    [queueItems],
+  );
+  const collapsedQueueTitle = useMemo(
+    () =>
+      collapsedQueueItems.every((item) => item.status === 'synced')
+        ? 'Erfolgreich synchronisierte Einträge'
+        : 'Weitere Queue-Einträge',
+    [collapsedQueueItems],
   );
 
   const runSyncSafely = async (work: () => Promise<void>, title: string) => {
@@ -576,8 +592,25 @@ export default function SettingsScreen() {
 
       <SectionCard>
         <SectionHeader
+          title="Downsync"
+          subtitle="Öffnet die manuelle Server-Vorschau für Einträge, die lokal fehlen oder von deiner lokalen Version abweichen."
+          action={
+            <Button
+              label="Öffnen"
+              variant="secondary"
+              onPress={() => router.push('/downsync')}
+            />
+          }
+        />
+        <Text style={styles.meta}>
+          Jeder Server-Eintrag kann dort einzeln bestätigt und lokal übernommen werden.
+        </Text>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionHeader
           title="Sync-Queue"
-          subtitle="Fehlgeschlagene Pushes bleiben lokal sichtbar."
+          subtitle="Fehlgeschlagene Pushes bleiben direkt sichtbar, erfolgreiche Einträge lassen sich bei Bedarf ausklappen."
           action={
             <Button
               label="Alle senden"
@@ -592,18 +625,54 @@ export default function SettingsScreen() {
             description="Sobald Requests gesendet werden, erscheinen Status und Payload hier."
           />
         ) : (
-          queueItems.map((item) => (
-            <SyncQueueCard
-              key={item.id}
-              item={item}
-              onRetry={() =>
-                runSyncSafely(
-                  () => retryItem(item.id),
-                  'Eintrag konnte nicht erneut gesendet werden',
-                )
-              }
-            />
-          ))
+          <>
+            {visibleQueueItems.map((item) => (
+              <SyncQueueCard
+                key={item.id}
+                item={item}
+                onRetry={() =>
+                  runSyncSafely(
+                    () => retryItem(item.id),
+                    'Eintrag konnte nicht erneut gesendet werden',
+                  )
+                }
+              />
+            ))}
+            {collapsedQueueItems.length > 0 ? (
+              <View style={styles.syncQueueGroup}>
+                <Pressable
+                  style={styles.syncQueueToggle}
+                  onPress={() => setShowCollapsedQueueItems((currentValue) => !currentValue)}
+                >
+                  <View style={styles.syncQueueToggleCopy}>
+                    <Text style={styles.syncQueueToggleTitle}>{collapsedQueueTitle}</Text>
+                    <Text style={styles.syncQueueToggleMeta}>
+                      {showCollapsedQueueItems
+                        ? 'Eingeklappte Einträge wieder ausblenden.'
+                        : `${collapsedQueueItems.length} Einträge ausklappen.`}
+                    </Text>
+                  </View>
+                  <Text style={styles.syncQueueToggleIcon}>
+                    {showCollapsedQueueItems ? 'Weniger' : 'Mehr'}
+                  </Text>
+                </Pressable>
+                {showCollapsedQueueItems
+                  ? collapsedQueueItems.map((item) => (
+                      <SyncQueueCard
+                        key={item.id}
+                        item={item}
+                        onRetry={() =>
+                          runSyncSafely(
+                            () => retryItem(item.id),
+                            'Eintrag konnte nicht erneut gesendet werden',
+                          )
+                        }
+                      />
+                    ))
+                  : null}
+              </View>
+            ) : null}
+          </>
         )}
       </SectionCard>
     </Screen>
@@ -614,6 +683,38 @@ const styles = StyleSheet.create({
   meta: {
     color: colors.textMuted,
     fontSize: 13,
+  },
+  syncQueueGroup: {
+    gap: spacing.md,
+  },
+  syncQueueToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.md,
+  },
+  syncQueueToggleCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  syncQueueToggleTitle: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  syncQueueToggleMeta: {
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+  syncQueueToggleIcon: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
   },
   actionRow: {
     flexDirection: 'row',
