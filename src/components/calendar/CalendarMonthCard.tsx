@@ -6,18 +6,22 @@ import { radii, spacing } from '../../constants/spacing';
 
 interface CalendarMonthCardProps {
   selectedDate: string;
+  visibleMonthDate: string;
   markedDates: Record<string, { marked?: boolean; dotColor?: string; selected?: boolean }>;
   onSelectDate: (dateKey: string) => void;
+  onChangeVisibleMonth: (dateKey: string) => void;
 }
 
 export const CalendarMonthCard = ({
   selectedDate,
+  visibleMonthDate,
   markedDates,
   onSelectDate,
+  onChangeVisibleMonth,
 }: CalendarMonthCardProps) => (
   <View style={styles.container}>
     <Calendar
-      current={selectedDate}
+      current={visibleMonthDate}
       markedDates={{
         ...markedDates,
         [selectedDate]: {
@@ -26,6 +30,7 @@ export const CalendarMonthCard = ({
         },
       }}
       onDayPress={(day: DateData) => onSelectDate(day.dateString)}
+      onMonthChange={(month: DateData) => onChangeVisibleMonth(month.dateString)}
       theme={{
         backgroundColor: colors.surface,
         calendarBackground: colors.surface,

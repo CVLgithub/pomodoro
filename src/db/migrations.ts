@@ -9,7 +9,13 @@ type UserVersionRow = {
   user_version: number;
 };
 
-const migrations = [
+type Migration = {
+  version: number;
+  statements?: () => string[];
+  apply?: (db: SQLite.SQLiteDatabase) => Promise<void>;
+};
+
+const migrations: readonly Migration[] = [
   {
     version: 1,
     statements: buildSchemaStatements,
@@ -55,6 +61,66 @@ const migrations = [
       ];
     },
   },
+  {
+    version: 4,
+    apply: async (db) => {
+      const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tasks);');
+      const hasCompletedAtColumn = columns.some((column) => column.name === 'completedAt');
+
+      if (!hasCompletedAtColumn) {
+        await db.execAsync('ALTER TABLE tasks ADD COLUMN completedAt TEXT;');
+      }
+
+      await db.execAsync(`
+        UPDATE tasks
+        SET completedAt = updatedAt
+        WHERE isCompleted = 1 AND completedAt IS NULL;
+      `);
+    },
+  },
+  {
+    version: 5,
+    apply: async (db) => {
+      const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tasks);');
+      const hasRecurrenceTypeColumn = columns.some((column) => column.name === 'recurrenceType');
+      const hasRecurrenceDaysColumn = columns.some((column) => column.name === 'recurrenceDays');
+
+      if (!hasRecurrenceTypeColumn) {
+        await db.execAsync("ALTER TABLE tasks ADD COLUMN recurrenceType TEXT NOT NULL DEFAULT 'none';");
+      }
+
+      if (!hasRecurrenceDaysColumn) {
+        await db.execAsync("ALTER TABLE tasks ADD COLUMN recurrenceDays TEXT NOT NULL DEFAULT '[]';");
+      }
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS task_occurrence_completions (
+          taskId TEXT NOT NULL,
+          date TEXT NOT NULL,
+          completedAt TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          PRIMARY KEY (taskId, date),
+          FOREIGN KEY (taskId) REFERENCES tasks (id) ON DELETE CASCADE
+        );
+      `);
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_task_occurrence_completions_date
+        ON task_occurrence_completions (date);
+      `);
+    },
+  },
+  {
+    version: 6,
+    apply: async (db) => {
+      const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tags);');
+      const hasGroupNameColumn = columns.some((column) => column.name === 'groupName');
+
+      if (!hasGroupNameColumn) {
+        await db.execAsync('ALTER TABLE tags ADD COLUMN groupName TEXT;');
+      }
+    },
+  },
 ] as const;
 
 export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> => {
@@ -69,8 +135,12 @@ export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> =>
     await db.execAsync('BEGIN IMMEDIATE TRANSACTION;');
 
     try {
-      for (const statement of migration.statements()) {
-        await db.execAsync(statement);
+      if (migration.apply) {
+        await migration.apply(db);
+      } else {
+        for (const statement of migration.statements?.() ?? []) {
+          await db.execAsync(statement);
+        }
       }
 
       await db.execAsync(`PRAGMA user_version = ${migration.version};`);

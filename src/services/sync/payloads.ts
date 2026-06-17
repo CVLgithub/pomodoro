@@ -1,8 +1,14 @@
-import { PushSessionPayload, PushTagPayload, PushTaskPayload } from '../../types/api';
+import {
+  PushSessionPayload,
+  PushTagGroupsPayload,
+  PushTagPayload,
+  PushTaskPayload,
+} from '../../types/api';
 import { Session } from '../../types/session';
 import { TagDeletePayload } from '../../types/tag';
 import { TaskDeletePayload } from '../../types/task';
 import { toLocalIsoString } from '../../utils/date';
+import { normalizeTagGroupNames } from '../../utils/tagGroups';
 
 export const toTaskPushPayload = (task: {
   id: string;
@@ -10,22 +16,32 @@ export const toTaskPushPayload = (task: {
   date: string | null;
   tagId: string;
   isCompleted: boolean;
+  recurrenceType: 'none' | 'weekly';
+  recurrenceDays: (0 | 1 | 2 | 3 | 4 | 5 | 6)[];
 }): PushTaskPayload => ({
   id: task.id,
   title: task.title,
   date: task.date,
   tagId: task.tagId,
   isCompleted: task.isCompleted,
+  recurrenceType: task.recurrenceType,
+  recurrenceDays: task.recurrenceDays,
 });
 
 export const toTagPushPayload = (tag: {
   id: string;
   name: string;
   color: string;
+  groupName: string | null;
 }): PushTagPayload => ({
   id: tag.id,
   name: tag.name,
   color: tag.color,
+  groupName: tag.groupName,
+});
+
+export const toTagGroupsPushPayload = (tagGroups: string[]): PushTagGroupsPayload => ({
+  tagGroups: normalizeTagGroupNames(tagGroups),
 });
 
 export const toSessionPushPayload = (

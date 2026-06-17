@@ -6,6 +6,7 @@ type SupportedIoniconName =
   | 'calendar-outline'
   | 'list-outline'
   | 'bar-chart-outline'
+  | 'repeat'
   | 'checkmark';
 
 interface IoniconProps {

@@ -17,6 +17,7 @@ export const buildSchemaStatements = (): string[] => {
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL COLLATE NOCASE UNIQUE,
         color TEXT NOT NULL,
+        groupName TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL
       );
@@ -28,9 +29,23 @@ export const buildSchemaStatements = (): string[] => {
         date TEXT,
         tagId TEXT NOT NULL,
         isCompleted INTEGER NOT NULL DEFAULT 0,
+        completedAt TEXT,
+        recurrenceType TEXT NOT NULL DEFAULT 'none',
+        recurrenceDays TEXT NOT NULL DEFAULT '[]',
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         FOREIGN KEY (tagId) REFERENCES tags (id) ON DELETE RESTRICT
+      );
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS task_occurrence_completions (
+        taskId TEXT NOT NULL,
+        date TEXT NOT NULL,
+        completedAt TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        PRIMARY KEY (taskId, date),
+        FOREIGN KEY (taskId) REFERENCES tasks (id) ON DELETE CASCADE
       );
     `,
     `
@@ -94,6 +109,7 @@ export const buildSchemaStatements = (): string[] => {
     'CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks (date);',
     'CREATE INDEX IF NOT EXISTS idx_tasks_tag_id ON tasks (tagId);',
     'CREATE INDEX IF NOT EXISTS idx_tasks_is_completed ON tasks (isCompleted);',
+    'CREATE INDEX IF NOT EXISTS idx_task_occurrence_completions_date ON task_occurrence_completions (date);',
     'CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions (date DESC);',
     'CREATE INDEX IF NOT EXISTS idx_sessions_sync_status ON sessions (syncStatus);',
     'CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue (status, updatedAt DESC);',

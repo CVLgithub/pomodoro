@@ -13,6 +13,19 @@ interface SyncQueueCardProps {
   onRetry: () => Promise<void> | void;
 }
 
+const ENTITY_LABELS: Record<SyncQueueItem['entityType'], string> = {
+  task: 'Aufgabe',
+  tag: 'Tag',
+  tagGroups: 'Gruppen',
+  session: 'Session',
+};
+
+const STATUS_LABELS: Record<SyncQueueItem['status'], string> = {
+  pending: 'wartet',
+  failed: 'fehlgeschlagen',
+  synced: 'gesendet',
+};
+
 export const SyncQueueCard = ({ item, onRetry }: SyncQueueCardProps) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -21,19 +34,19 @@ export const SyncQueueCard = ({ item, onRetry }: SyncQueueCardProps) => {
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.title}>
-            {item.entityType} · {item.status}
+            {ENTITY_LABELS[item.entityType]} · {STATUS_LABELS[item.status]}
           </Text>
-          <Text style={styles.meta}>{item.endpoint}</Text>
+          <Text style={styles.meta}>Wird erneut gesendet</Text>
         </View>
         <Button label="Erneut senden" variant="secondary" onPress={() => void onRetry()} />
       </View>
       {item.errorMessage ? <Text style={styles.error}>{item.errorMessage}</Text> : null}
       <View style={styles.controls}>
         <Pressable onPress={() => setExpanded((value) => !value)}>
-          <Text style={styles.link}>{expanded ? 'JSON ausblenden' : 'JSON anzeigen'}</Text>
+          <Text style={styles.link}>{expanded ? 'Details ausblenden' : 'Details anzeigen'}</Text>
         </Pressable>
         <Pressable onPress={() => void copyToClipboard(item.payloadJson)}>
-          <Text style={styles.link}>JSON kopieren</Text>
+          <Text style={styles.link}>Details kopieren</Text>
         </Pressable>
       </View>
       {expanded ? (

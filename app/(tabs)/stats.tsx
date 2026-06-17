@@ -116,8 +116,8 @@ export default function StatsScreen() {
   return (
     <Screen
       title="Statistik"
-      subtitle="Detailierte Fokus Historie."
-      headerRight={<Button label="Settings" variant="ghost" onPress={() => router.push('/settings')} />}
+      subtitle="Deine abgeschlossenen Sessions im Überblick."
+      headerRight={<Button label="Einstellungen" variant="ghost" onPress={() => router.push('/settings')} />}
     >
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <StatSummaryCard label="Heute" value={formatMinutesShort(todayMinutes)} />
@@ -136,8 +136,8 @@ export default function StatsScreen() {
 
       {sortedDates.length === 0 ? (
         <EmptyState
-          title="Noch keine Fokus-Sessions"
-          description="Sobald du Fokus-Timer abschließt, erscheint hier die Session-Historie."
+          title="Noch keine Sessions"
+          description="Sobald du den Timer abschließt, erscheint hier deine Historie."
         />
       ) : (
         sortedDates.map((date) => (

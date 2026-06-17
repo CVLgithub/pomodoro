@@ -8,23 +8,42 @@ import {
   updateSyncQueueItemStatus,
 } from '../../db/repositories/syncQueueRepository';
 import { updateSessionSyncStatus } from '../../db/repositories/sessionsRepository';
-import { PushSessionPayload, PushTagPayload, PushTaskPayload } from '../../types/api';
+import {
+  PushSessionPayload,
+  PushTagGroupsPayload,
+  PushTagPayload,
+  PushTaskPayload,
+} from '../../types/api';
 import { SyncEntityType, SyncQueueItem } from '../../types/sync';
-import { pushSessionPayload, pushTagPayload, pushTaskPayload } from '../api/pushService';
+import { normalizeTagGroupNames } from '../../utils/tagGroups';
+import {
+  pushSessionPayload,
+  pushTagGroupsPayload,
+  pushTagPayload,
+  pushTaskPayload,
+} from '../api/pushService';
+
+const TAG_GROUPS_ENTITY_ID = 'tagGroups';
+type SyncPayload =
+  | PushTaskPayload
+  | PushTagPayload
+  | PushTagGroupsPayload
+  | PushSessionPayload;
 
 const syncHandlers: Record<
   SyncEntityType,
-  (payload: PushTaskPayload | PushTagPayload | PushSessionPayload) => Promise<void>
+  (payload: SyncPayload) => Promise<void>
 > = {
   task: async (payload) => pushTaskPayload(payload as PushTaskPayload),
   tag: async (payload) => pushTagPayload(payload as PushTagPayload),
+  tagGroups: async (payload) => pushTagGroupsPayload(payload as PushTagGroupsPayload),
   session: async (payload) => pushSessionPayload(payload as PushSessionPayload),
 };
 
 const normalizeSyncPayload = (
   entityType: SyncEntityType,
-  payload: PushTaskPayload | PushTagPayload | PushSessionPayload,
-): PushTaskPayload | PushTagPayload | PushSessionPayload => {
+  payload: SyncPayload,
+): SyncPayload => {
   if (entityType === 'task') {
     const taskPayload = payload as PushTaskPayload;
 
@@ -38,6 +57,8 @@ const normalizeSyncPayload = (
       date: taskPayload.date,
       tagId: taskPayload.tagId,
       isCompleted: taskPayload.isCompleted,
+      recurrenceType: taskPayload.recurrenceType,
+      recurrenceDays: taskPayload.recurrenceDays,
     };
   }
 
@@ -52,6 +73,15 @@ const normalizeSyncPayload = (
       id: tagPayload.id,
       name: tagPayload.name,
       color: tagPayload.color,
+      groupName: tagPayload.groupName,
+    };
+  }
+
+  if (entityType === 'tagGroups') {
+    const tagGroupsPayload = payload as PushTagGroupsPayload;
+
+    return {
+      tagGroups: normalizeTagGroupNames(tagGroupsPayload.tagGroups),
     };
   }
 
@@ -77,7 +107,7 @@ const isQueueItemSuperseded = async (item: SyncQueueItem): Promise<boolean> => {
 
 const performSyncRequest = async (
   item: SyncQueueItem,
-  payload: PushTaskPayload | PushTagPayload | PushSessionPayload,
+  payload: SyncPayload,
   retryCount = item.retryCount,
 ): Promise<void> => {
   if (await isQueueItemSuperseded(item)) {
@@ -113,7 +143,7 @@ const enqueueAndPush = async (
   entityType: SyncEntityType,
   entityId: string,
   endpoint: string,
-  payload: PushTaskPayload | PushTagPayload | PushSessionPayload,
+  payload: SyncPayload,
 ): Promise<void> => {
   const normalizedPayload = normalizeSyncPayload(entityType, payload);
   await deleteUnsyncedSyncQueueItemsByEntity(entityType, entityId);
@@ -134,6 +164,9 @@ export const syncManager = {
   pushTag: async (entityId: string, payload: PushTagPayload): Promise<void> => {
     await enqueueAndPush('tag', entityId, '/push/tag', payload);
   },
+  pushTagGroups: async (payload: PushTagGroupsPayload): Promise<void> => {
+    await enqueueAndPush('tagGroups', TAG_GROUPS_ENTITY_ID, '/push/tag-groups', payload);
+  },
   pushSession: async (payload: PushSessionPayload): Promise<void> => {
     await enqueueAndPush('session', payload.id, '/push/session', payload);
   },
@@ -152,6 +185,7 @@ export const syncManager = {
     const payload = JSON.parse(item.payloadJson) as
       | PushTaskPayload
       | PushTagPayload
+      | PushTagGroupsPayload
       | PushSessionPayload;
 
     await performSyncRequest(item, payload, item.retryCount + 1);

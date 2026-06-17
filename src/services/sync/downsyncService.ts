@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 import { GENERAL_TAG_ID, GENERAL_TAG_NAME } from '../../constants/config';
 import { getDatabase } from '../../db/client';
+import { getTagGroupsSetting } from '../../db/repositories/settingsRepository';
 import { listSessions } from '../../db/repositories/sessionsRepository';
 import { listTags } from '../../db/repositories/tagsRepository';
 import { listTasks } from '../../db/repositories/tasksRepository';
@@ -10,12 +11,23 @@ import { Session } from '../../types/session';
 import { Tag } from '../../types/tag';
 import { Task } from '../../types/task';
 import { toLocalIsoString } from '../../utils/date';
+import {
+  getTagGroupLabel,
+  normalizeCustomTagGroupName,
+  normalizeTagGroupNames,
+} from '../../utils/tagGroups';
+import {
+  formatTaskRecurrenceDays,
+  normalizeTaskRecurrence,
+} from '../../utils/taskRecurrence';
 import { fetchEntries } from '../api/entriesService';
 
 const TIME_ONLY_PATTERN = /^\d{2}:\d{2}(?::\d{2})?$/;
 const TEMP_TAG_NAME_PREFIX = '__downsync_tag__';
+const TAG_GROUPS_SETTING_KEY = 'tagGroups';
+const TAG_GROUPS_ENTITY_ID = 'tagGroups';
 
-export type DownsyncEntityType = 'tag' | 'task' | 'session';
+export type DownsyncEntityType = 'tag' | 'tagGroups' | 'task' | 'session';
 
 export interface DownsyncPreviewEntry {
   id: string;
@@ -28,22 +40,31 @@ export interface DownsyncPreviewEntry {
   dependencyHint?: string;
 }
 
-type NormalizedEntries = EntriesResponse;
+type NormalizedEntries = Omit<EntriesResponse, 'tagGroups'> & {
+  tagGroups: string[];
+};
 
 type LocalEntriesState = {
   tagsById: Map<string, Tag>;
   tasksById: Map<string, Task>;
   sessionsById: Map<string, Session>;
+  tagGroups: string[];
 };
 
 const DOWNYNC_TYPE_ORDER: Record<DownsyncEntityType, number> = {
   session: 0,
-  tag: 1,
-  task: 2,
+  tagGroups: 1,
+  tag: 2,
+  task: 3,
 };
 
 const isGeneralTagName = (value: string): boolean =>
   value.trim().localeCompare(GENERAL_TAG_NAME, 'de-DE', { sensitivity: 'accent' }) === 0;
+
+const hasTagGroupName = (groupNames: string[], groupName: string): boolean =>
+  groupNames.some(
+    (entry) => entry.localeCompare(groupName, 'de-DE', { sensitivity: 'base' }) === 0,
+  );
 
 const toSessionDateTime = (dateKey: string, timeValue: string): string => {
   if (timeValue.includes('T')) {
@@ -68,6 +89,7 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
       ...tag,
       id: normalizedId,
       name: normalizedId === GENERAL_TAG_ID ? GENERAL_TAG_NAME : tag.name.trim(),
+      groupName: normalizeCustomTagGroupName(tag.groupName),
     };
 
     tagIdMap.set(tag.id, normalizedId);
@@ -79,10 +101,15 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
   }
 
   return {
+    tagGroups: normalizeTagGroupNames([
+      ...(entries.tagGroups ?? []),
+      ...Array.from(normalizedTagsMap.values()).map((tag) => tag.groupName),
+    ]),
     tags: Array.from(normalizedTagsMap.values()),
     tasks: entries.tasks.map((task) => ({
       ...task,
       tagId: tagIdMap.get(task.tagId) ?? task.tagId,
+      ...normalizeTaskRecurrence(task.recurrenceType, task.recurrenceDays),
     })),
     sessions: entries.sessions.map((session) => ({
       ...session,
@@ -96,17 +123,35 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
 const fetchNormalizedEntries = async (): Promise<NormalizedEntries> =>
   normalizeEntries(await fetchEntries());
 
+const buildOpenTaskEntries = (entries: NormalizedEntries): NormalizedEntries => {
+  const openTasks = entries.tasks.filter((task) => !task.isCompleted);
+  const requiredTagIds = new Set(openTasks.map((task) => task.tagId));
+  const requiredTags = entries.tags.filter((tag) => requiredTagIds.has(tag.id));
+
+  return {
+    tagGroups: normalizeTagGroupNames(requiredTags.map((tag) => tag.groupName)),
+    tags: requiredTags,
+    tasks: openTasks,
+    sessions: [],
+  };
+};
+
 const loadLocalEntriesState = async (): Promise<LocalEntriesState> => {
-  const [tags, tasks, sessions] = await Promise.all([
+  const [tags, tasks, sessions, savedTagGroups] = await Promise.all([
     listTags(),
     listTasks(),
     listSessions(),
+    getTagGroupsSetting(),
   ]);
 
   return {
     tagsById: new Map(tags.map((tag) => [tag.id, tag])),
     tasksById: new Map(tasks.map((task) => [task.id, task])),
     sessionsById: new Map(sessions.map((session) => [session.id, session])),
+    tagGroups: normalizeTagGroupNames([
+      ...savedTagGroups,
+      ...tags.map((tag) => tag.groupName),
+    ]),
   };
 };
 
@@ -116,21 +161,31 @@ const matchesTag = (localTag: Tag | undefined, remoteTag: EntriesTag): boolean =
       localTag.id === remoteTag.id &&
       localTag.name === remoteTag.name &&
       localTag.color === remoteTag.color &&
+      localTag.groupName === normalizeCustomTagGroupName(remoteTag.groupName) &&
       localTag.createdAt === remoteTag.createdAt &&
       localTag.updatedAt === remoteTag.updatedAt,
   );
 
-const matchesTask = (localTask: Task | undefined, remoteTask: EntriesTask): boolean =>
-  Boolean(
+const matchesTask = (localTask: Task | undefined, remoteTask: EntriesTask): boolean => {
+  const normalizedRecurrence = normalizeTaskRecurrence(
+    remoteTask.recurrenceType,
+    remoteTask.recurrenceDays,
+  );
+
+  return Boolean(
     localTask &&
       localTask.id === remoteTask.id &&
       localTask.title === remoteTask.title &&
       localTask.date === remoteTask.date &&
       localTask.tagId === remoteTask.tagId &&
       localTask.isCompleted === remoteTask.isCompleted &&
+      localTask.recurrenceType === normalizedRecurrence.recurrenceType &&
+      JSON.stringify(localTask.recurrenceDays) ===
+        JSON.stringify(normalizedRecurrence.recurrenceDays) &&
       localTask.createdAt === remoteTask.createdAt &&
       localTask.updatedAt === remoteTask.updatedAt,
   );
+};
 
 const matchesSession = (
   localSession: Session | undefined,
@@ -149,7 +204,7 @@ const matchesSession = (
   );
 
 const buildStatusLabel = (existsLocally: boolean): string =>
-  existsLocally ? 'Server-Version weicht lokal ab' : 'Neu auf Server';
+  existsLocally ? 'Geändert' : 'Neu';
 
 const buildDependencyHint = (dependencies: string[]): string | undefined => {
   if (dependencies.length === 0) {
@@ -209,17 +264,19 @@ const adoptTagNameConflict = async (
 
   await db.runAsync(
     `
-      INSERT INTO tags (id, name, color, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO tags (id, name, color, groupName, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         color = excluded.color,
+        groupName = excluded.groupName,
         createdAt = excluded.createdAt,
         updatedAt = excluded.updatedAt;
     `,
     incomingTag.id,
     incomingTag.name,
     incomingTag.color,
+    normalizeCustomTagGroupName(incomingTag.groupName),
     incomingTag.createdAt,
     incomingTag.updatedAt,
   );
@@ -283,6 +340,33 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
   await db.execAsync('BEGIN IMMEDIATE TRANSACTION;');
 
   try {
+    const incomingTagGroups = normalizeTagGroupNames([
+      ...entries.tagGroups,
+      ...entries.tags.map((tag) => tag.groupName),
+    ]);
+
+    if (incomingTagGroups.length > 0) {
+      const mergedTagGroups = normalizeTagGroupNames([
+        ...localState.tagGroups,
+        ...incomingTagGroups,
+      ]);
+
+      await db.runAsync(
+        "DELETE FROM sync_queue WHERE entityType = 'tagGroups' AND entityId = ? AND status != 'synced';",
+        TAG_GROUPS_ENTITY_ID,
+      );
+      await db.runAsync(
+        `
+          INSERT INTO app_settings (key, value, updatedAt)
+          VALUES (?, ?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt;
+        `,
+        TAG_GROUPS_SETTING_KEY,
+        JSON.stringify(mergedTagGroups),
+        toLocalIsoString(),
+      );
+    }
+
     for (const tag of entries.tags) {
       await adoptTagNameConflict(db, tag);
       await db.runAsync(
@@ -291,36 +375,52 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
       );
       await db.runAsync(
         `
-          INSERT INTO tags (id, name, color, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO tags (id, name, color, groupName, createdAt, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             color = excluded.color,
+            groupName = excluded.groupName,
             createdAt = excluded.createdAt,
             updatedAt = excluded.updatedAt;
         `,
         tag.id,
         tag.name,
         tag.color,
+        normalizeCustomTagGroupName(tag.groupName),
         tag.createdAt,
         tag.updatedAt,
       );
     }
 
     for (const task of entries.tasks) {
+      const normalizedRecurrence = normalizeTaskRecurrence(
+        task.recurrenceType,
+        task.recurrenceDays,
+      );
+
       await db.runAsync(
         "DELETE FROM sync_queue WHERE entityType = 'task' AND entityId = ? AND status != 'synced';",
         task.id,
       );
       await db.runAsync(
         `
-          INSERT INTO tasks (id, title, date, tagId, isCompleted, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO tasks (
+            id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             date = excluded.date,
             tagId = excluded.tagId,
             isCompleted = excluded.isCompleted,
+            completedAt =
+              CASE
+                WHEN excluded.isCompleted = 0 THEN NULL
+                ELSE COALESCE(tasks.completedAt, excluded.updatedAt)
+              END,
+            recurrenceType = excluded.recurrenceType,
+            recurrenceDays = excluded.recurrenceDays,
             createdAt = excluded.createdAt,
             updatedAt = excluded.updatedAt;
         `,
@@ -329,6 +429,9 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
         task.date,
         task.tagId,
         task.isCompleted ? 1 : 0,
+        task.isCompleted ? task.updatedAt : null,
+        normalizedRecurrence.recurrenceType,
+        JSON.stringify(normalizedRecurrence.recurrenceDays),
         task.createdAt,
         task.updatedAt,
       );
@@ -386,7 +489,27 @@ const buildPendingDownsyncEntries = (
 ): DownsyncPreviewEntry[] => {
   const remoteTagsById = new Map(entries.tags.map((tag) => [tag.id, tag]));
   const remoteTasksById = new Map(entries.tasks.map((task) => [task.id, task]));
+  const remoteTagGroupNames = normalizeTagGroupNames(entries.tags.map((tag) => tag.groupName));
   const pendingEntries: DownsyncPreviewEntry[] = [];
+
+  for (const groupName of entries.tagGroups) {
+    if (
+      hasTagGroupName(localState.tagGroups, groupName) ||
+      hasTagGroupName(remoteTagGroupNames, groupName)
+    ) {
+      continue;
+    }
+
+    pendingEntries.push({
+      id: `tagGroups:${groupName}`,
+      entityType: 'tagGroups',
+      entityId: groupName,
+      title: groupName,
+      subtitle: 'Gruppe · Neu',
+      detail: 'Leere Tag-Gruppe',
+      statusLabel: 'Neu',
+    });
+  }
 
   for (const tag of entries.tags) {
     const localTag = localState.tagsById.get(tag.id);
@@ -400,7 +523,7 @@ const buildPendingDownsyncEntries = (
       entityId: tag.id,
       title: tag.name,
       subtitle: `Tag · ${buildStatusLabel(Boolean(localTag))}`,
-      detail: `Farbe ${tag.color}`,
+      detail: `Gruppe ${getTagGroupLabel(tag.groupName)} - Farbe ${tag.color}`,
       statusLabel: buildStatusLabel(Boolean(localTag)),
     });
   }
@@ -423,7 +546,7 @@ const buildPendingDownsyncEntries = (
       entityId: task.id,
       title: task.title,
       subtitle: `Aufgabe · ${buildStatusLabel(Boolean(localTask))}`,
-      detail: `${task.date ?? 'Ohne Datum'} · ${task.isCompleted ? 'Erledigt' : 'Offen'}`,
+      detail: `${task.recurrenceType === 'weekly' ? `Wiederholend - ${formatTaskRecurrenceDays(task.recurrenceDays ?? [])}` : task.date ?? 'Ohne Datum'} · ${task.isCompleted ? 'Erledigt' : 'Offen'}`,
       statusLabel: buildStatusLabel(Boolean(localTask)),
       dependencyHint: buildDependencyHint(dependencies),
     });
@@ -479,12 +602,25 @@ const buildImportSubset = async (
   const remoteTasksById = new Map(entries.tasks.map((task) => [task.id, task]));
   const remoteSessionsById = new Map(entries.sessions.map((session) => [session.id, session]));
   const subset: NormalizedEntries = {
+    tagGroups: [],
     tags: [],
     tasks: [],
     sessions: [],
   };
   const includedTags = new Set<string>();
+  const includedTagGroups = new Set<string>();
   const includedTasks = new Set<string>();
+
+  const ensureTagGroup = (groupName?: string | null): void => {
+    const normalizedGroupName = normalizeCustomTagGroupName(groupName);
+
+    if (!normalizedGroupName || includedTagGroups.has(normalizedGroupName.toLocaleLowerCase('de-DE'))) {
+      return;
+    }
+
+    subset.tagGroups.push(normalizedGroupName);
+    includedTagGroups.add(normalizedGroupName.toLocaleLowerCase('de-DE'));
+  };
 
   const ensureTag = (tagId: string): string => {
     if (tagId === GENERAL_TAG_ID && !remoteTagsById.has(GENERAL_TAG_ID)) {
@@ -496,6 +632,7 @@ const buildImportSubset = async (
       if (!includedTags.has(remoteTag.id)) {
         subset.tags.push(remoteTag);
         includedTags.add(remoteTag.id);
+        ensureTagGroup(remoteTag.groupName);
       }
 
       return remoteTag.id;
@@ -528,17 +665,31 @@ const buildImportSubset = async (
   if (entityType === 'tag') {
     const remoteTag = remoteTagsById.get(entityId);
     if (!remoteTag) {
-      throw new Error('Der ausgewählte Server-Tag wurde nicht mehr gefunden.');
+      throw new Error('Der ausgewählte Tag wurde nicht mehr gefunden.');
     }
 
     ensureTag(remoteTag.id);
     return subset;
   }
 
+  if (entityType === 'tagGroups') {
+    const remoteGroupName = entries.tagGroups.find(
+      (groupName) =>
+        groupName.localeCompare(entityId, 'de-DE', { sensitivity: 'base' }) === 0,
+    );
+
+    if (!remoteGroupName) {
+      throw new Error('Die ausgewählte Gruppe wurde nicht mehr gefunden.');
+    }
+
+    ensureTagGroup(remoteGroupName);
+    return subset;
+  }
+
   if (entityType === 'task') {
     const remoteTask = remoteTasksById.get(entityId);
     if (!remoteTask) {
-      throw new Error('Die ausgewählte Server-Aufgabe wurde nicht mehr gefunden.');
+      throw new Error('Die ausgewählte Aufgabe wurde nicht mehr gefunden.');
     }
 
     ensureTask(remoteTask.id);
@@ -547,7 +698,7 @@ const buildImportSubset = async (
 
   const remoteSession = remoteSessionsById.get(entityId);
   if (!remoteSession) {
-    throw new Error('Die ausgewählte Server-Session wurde nicht mehr gefunden.');
+    throw new Error('Die ausgewählte Session wurde nicht mehr gefunden.');
   }
 
   subset.sessions.push({
@@ -584,4 +735,9 @@ export const downsyncEntries = async (): Promise<void> => {
 
   const entries = await fetchNormalizedEntries();
   await applyEntries(entries);
+};
+
+export const downsyncOpenTasks = async (): Promise<void> => {
+  const entries = await fetchNormalizedEntries();
+  await applyEntries(buildOpenTaskEntries(entries));
 };

@@ -13,6 +13,7 @@ import { useSessionsStore } from '../src/store/sessionsStore';
 import { useTagsStore } from '../src/store/tagsStore';
 import { getMonthStart, getWeekStart, formatDateKey } from '../src/utils/date';
 import { formatMinutesShort } from '../src/utils/duration';
+import { compareTagGroupNames, getTagGroupKey, getTagGroupLabel } from '../src/utils/tagGroups';
 
 type ChartRange = 'week' | 'month';
 
@@ -33,8 +34,19 @@ type TagStat = {
   tagId: string;
   label: string;
   color: string;
+  groupName: string | null;
+  groupLabel: string;
   totalMinutes: number;
   activeDays: number;
+};
+
+type GroupStat = {
+  groupKey: string;
+  label: string;
+  color: string;
+  totalMinutes: number;
+  activeDays: number;
+  tagCount: number;
 };
 
 const CHART_HEIGHT = 220;
@@ -116,6 +128,7 @@ export default function StatsChartScreen() {
   const tags = useTagsStore((state) => state.tags);
   const [range, setRange] = useState<ChartRange>('week');
   const [monthAnchor, setMonthAnchor] = useState(() => getMonthStart(new Date()));
+  const [showAllTimeTagDetails, setShowAllTimeTagDetails] = useState(false);
   const currentMonthKey = formatDateKey(getMonthStart(new Date()));
   const selectedMonthKey = formatDateKey(monthAnchor);
   const canGoToNextMonth = selectedMonthKey < currentMonthKey;
@@ -176,11 +189,14 @@ export default function StatsChartScreen() {
     const tagStats: TagStat[] = Array.from(totalsByTagInRange.entries())
       .map(([tagId, entry]) => {
         const tag = tagById[tagId];
+        const groupName = tag?.groupName ?? null;
 
         return {
           tagId,
           label: tag?.name ?? 'Unbekannt',
           color: tag?.color ?? FALLBACK_TAG_COLOR,
+          groupName,
+          groupLabel: getTagGroupLabel(groupName),
           totalMinutes: entry.minutes,
           activeDays: entry.activeDates.size,
         };
@@ -213,6 +229,16 @@ export default function StatsChartScreen() {
     const tagById = Object.fromEntries(tags.map((tag) => [tag.id, tag]));
     const activeDates = new Set<string>();
     const totalsByTag = new Map<string, { minutes: number; activeDates: Set<string> }>();
+    const totalsByGroup = new Map<
+      string,
+      {
+        label: string;
+        minutes: number;
+        activeDates: Set<string>;
+        tagIds: Set<string>;
+        tagMinutes: Map<string, number>;
+      }
+    >();
 
     sessions.forEach((session) => {
       if (session.durationMinutes <= 0) {
@@ -220,6 +246,7 @@ export default function StatsChartScreen() {
       }
 
       activeDates.add(session.date);
+      const tag = tagById[session.tagId];
 
       const entry = totalsByTag.get(session.tagId) ?? {
         minutes: 0,
@@ -229,18 +256,80 @@ export default function StatsChartScreen() {
       entry.minutes += session.durationMinutes;
       entry.activeDates.add(session.date);
       totalsByTag.set(session.tagId, entry);
+
+      const groupKey = getTagGroupKey(tag?.groupName);
+      const groupEntry = totalsByGroup.get(groupKey) ?? {
+        label: getTagGroupLabel(tag?.groupName),
+        minutes: 0,
+        activeDates: new Set<string>(),
+        tagIds: new Set<string>(),
+        tagMinutes: new Map<string, number>(),
+      };
+
+      groupEntry.minutes += session.durationMinutes;
+      groupEntry.activeDates.add(session.date);
+      groupEntry.tagIds.add(session.tagId);
+      groupEntry.tagMinutes.set(
+        session.tagId,
+        (groupEntry.tagMinutes.get(session.tagId) ?? 0) + session.durationMinutes,
+      );
+      totalsByGroup.set(groupKey, groupEntry);
     });
 
     const tagStats: TagStat[] = Array.from(totalsByTag.entries())
       .map(([tagId, entry]) => {
         const tag = tagById[tagId];
+        const groupName = tag?.groupName ?? null;
 
         return {
           tagId,
           label: tag?.name ?? 'Unbekannt',
           color: tag?.color ?? FALLBACK_TAG_COLOR,
+          groupName,
+          groupLabel: getTagGroupLabel(groupName),
           totalMinutes: entry.minutes,
           activeDays: entry.activeDates.size,
+        };
+      })
+      .sort((left, right) => {
+        const groupCompare = compareTagGroupNames(left.groupName, right.groupName);
+
+        if (groupCompare !== 0) {
+          return groupCompare;
+        }
+
+        if (right.totalMinutes !== left.totalMinutes) {
+          return right.totalMinutes - left.totalMinutes;
+        }
+
+        if (right.activeDays !== left.activeDays) {
+          return right.activeDays - left.activeDays;
+        }
+
+        return left.label.localeCompare(right.label, 'de-DE');
+      });
+
+    const groupStats: GroupStat[] = Array.from(totalsByGroup.entries())
+      .map(([groupKey, entry]) => {
+        let dominantTagId: string | null = null;
+        let dominantTagMinutes = -1;
+
+        entry.tagMinutes.forEach((minutes, tagId) => {
+          if (minutes > dominantTagMinutes) {
+            dominantTagId = tagId;
+            dominantTagMinutes = minutes;
+          }
+        });
+
+        const dominantTag = dominantTagId ? tagById[dominantTagId] : undefined;
+
+        return {
+          groupKey,
+          label: entry.label,
+          color: dominantTag?.color ?? FALLBACK_TAG_COLOR,
+          totalMinutes: entry.minutes,
+          activeDays: entry.activeDates.size,
+          tagCount: entry.tagIds.size,
         };
       })
       .sort((left, right) => {
@@ -262,6 +351,7 @@ export default function StatsChartScreen() {
       totalMinutes,
       activeDays,
       averageMinutesPerActiveDay: activeDays > 0 ? Math.round(totalMinutes / activeDays) : 0,
+      groupStats,
       tagStats,
     };
   }, [sessions, tags]);
@@ -272,7 +362,7 @@ export default function StatsChartScreen() {
   return (
     <Screen
       title="Statistik Diagramm"
-      subtitle="Tagesbalken nach Tags für die aktuelle Woche oder einen ausgewählten Monat."
+      subtitle="Tagesbalken nach Tags für Woche oder Monat."
       headerRight={<Button label="Zurück" variant="ghost" onPress={() => router.back()} />}
     >
       <SectionCard>
@@ -377,7 +467,7 @@ export default function StatsChartScreen() {
         {chartData.sessionsInRange.length === 0 ? (
           <EmptyState
             title="Keine Sessions im Zeitraum"
-            description="Sobald in diesem Zeitraum Fokus-Sessions vorhanden sind, erscheinen hier gestapelte Tagesbalken."
+            description="Sobald in diesem Zeitraum Sessions vorhanden sind, erscheinen hier gestapelte Tagesbalken."
           />
         ) : (
           <ScrollView
@@ -437,11 +527,11 @@ export default function StatsChartScreen() {
               ))}
             </View>
           ) : (
-            <Text style={styles.supportText}>Im ausgewaehlten Zeitraum wurden noch keine Tags gelernt.</Text>
+            <Text style={styles.supportText}>Im ausgewählten Zeitraum gibt es noch keine Einträge.</Text>
           )}
 
           <View style={styles.subsection}>
-            <Text style={styles.subsectionTitle}>Lernzeit nach Tags</Text>
+            <Text style={styles.subsectionTitle}>Zeit nach Tags</Text>
             {chartData.tagStats.length > 0 ? (
               <View style={styles.tagStatsList}>
                 {chartData.tagStats.map((tag, index) => (
@@ -462,7 +552,7 @@ export default function StatsChartScreen() {
               </View>
             ) : (
               <Text style={styles.supportText}>
-                Fuer den ausgewaehlten Zeitraum gibt es noch keine Lernzeit pro Tag-Label.
+                Für den ausgewählten Zeitraum gibt es noch keine Zeit pro Tag.
               </Text>
             )}
           </View>
@@ -479,13 +569,13 @@ export default function StatsChartScreen() {
         <View style={styles.allTimeSummaryGrid}>
           <View style={styles.summaryHalfCard}>
             <StatSummaryCard
-              label="Gesamtlernzeit"
+              label="Gesamtzeit"
               value={formatMinutesShort(allTimeData.totalMinutes)}
             />
           </View>
           <View style={styles.summaryHalfCard}>
             <StatSummaryCard
-              label="Gelernte Tage"
+              label="Aktive Tage"
               value={String(allTimeData.activeDays)}
             />
           </View>
@@ -499,36 +589,88 @@ export default function StatsChartScreen() {
         </View>
 
         <View style={styles.subsection}>
-          <Text style={styles.subsectionTitle}>Tags nach Gesamtlernzeit</Text>
-          {allTimeData.tagStats.length > 0 ? (
+          <View style={styles.subsectionHeader}>
+            <Text style={styles.subsectionTitle}>Zeit nach Tag-Gruppen</Text>
+            {allTimeData.tagStats.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowAllTimeTagDetails((currentValue) => !currentValue)}
+                style={[
+                  styles.advancedToggle,
+                  showAllTimeTagDetails ? styles.advancedToggleActive : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.advancedToggleLabel,
+                    showAllTimeTagDetails ? styles.advancedToggleLabelActive : null,
+                  ]}
+                >
+                  {showAllTimeTagDetails ? 'Weniger' : 'Erweitert'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {allTimeData.groupStats.length > 0 ? (
             <View style={styles.tagStatsList}>
-              {allTimeData.tagStats.map((tag, index) => (
+              {allTimeData.groupStats.map((group, index) => (
                 <View
-                  key={tag.tagId}
+                  key={group.groupKey}
                   style={[
                     styles.tagStatsRow,
-                    index < allTimeData.tagStats.length - 1 ? styles.tagStatsRowBorder : null,
+                    index < allTimeData.groupStats.length - 1 ? styles.tagStatsRowBorder : null,
                   ]}
                 >
                   <View style={styles.tagStatsInfo}>
-                    <View style={[styles.legendSwatch, { backgroundColor: tag.color }]} />
+                    <View style={[styles.legendSwatch, { backgroundColor: group.color }]} />
                     <View style={styles.tagStatsText}>
-                      <Text style={styles.tagStatsLabel}>{tag.label}</Text>
+                      <Text style={styles.tagStatsLabel}>{group.label}</Text>
                       <Text style={styles.tagStatsMeta}>
-                        {tag.activeDays} {tag.activeDays === 1 ? 'gelernter Tag' : 'gelernte Tage'}
+                        {group.tagCount} {group.tagCount === 1 ? 'Tag' : 'Tags'} - {group.activeDays}{' '}
+                        {group.activeDays === 1 ? 'aktiver Tag' : 'aktive Tage'}
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.tagStatsValue}>{formatMinutesShort(tag.totalMinutes)}</Text>
+                  <Text style={styles.tagStatsValue}>{formatMinutesShort(group.totalMinutes)}</Text>
                 </View>
               ))}
             </View>
           ) : (
             <EmptyState
               title="Noch keine Allzeit-Daten"
-              description="Sobald Sessions vorhanden sind, erscheinen hier die Gesamtwerte und die Sortierung der Tags."
+              description="Sobald Sessions vorhanden sind, erscheinen hier die Gesamtwerte nach Tag-Gruppen."
             />
           )}
+
+          {showAllTimeTagDetails && allTimeData.tagStats.length > 0 ? (
+            <View style={styles.advancedTagStats}>
+              <Text style={styles.advancedTagStatsTitle}>Einzelne Tags</Text>
+              <View style={styles.tagStatsList}>
+                {allTimeData.tagStats.map((tag, index) => (
+                  <View
+                    key={tag.tagId}
+                    style={[
+                      styles.tagStatsRow,
+                      index < allTimeData.tagStats.length - 1 ? styles.tagStatsRowBorder : null,
+                    ]}
+                  >
+                    <View style={styles.tagStatsInfo}>
+                      <View style={[styles.legendSwatch, { backgroundColor: tag.color }]} />
+                      <View style={styles.tagStatsText}>
+                        <Text style={styles.tagStatsLabel}>{tag.label}</Text>
+                        <Text style={styles.tagStatsMeta}>
+                          {tag.groupLabel} - {tag.activeDays}{' '}
+                          {tag.activeDays === 1 ? 'aktiver Tag' : 'aktive Tage'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.tagStatsValue}>{formatMinutesShort(tag.totalMinutes)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
         </View>
       </SectionCard>
     </Screen>
@@ -753,6 +895,42 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 15,
     fontWeight: '600',
+  },
+  subsectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    flexWrap: 'wrap',
+  },
+  advancedToggle: {
+    minHeight: 34,
+    justifyContent: 'center',
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: spacing.md,
+  },
+  advancedToggleActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
+  },
+  advancedToggleLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  advancedToggleLabelActive: {
+    color: colors.textPrimary,
+  },
+  advancedTagStats: {
+    gap: spacing.sm,
+  },
+  advancedTagStatsTitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
   },
   allTimeDivider: {
     flexDirection: 'row',

@@ -11,6 +11,7 @@ interface TaskDateFieldProps {
   isPickerVisible: boolean;
   onTogglePicker: () => void;
   onChangeDate: (date: string | null) => void;
+  label?: string;
 }
 
 export const TaskDateField = ({
@@ -18,13 +19,14 @@ export const TaskDateField = ({
   isPickerVisible,
   onTogglePicker,
   onChangeDate,
+  label = 'Datum',
 }: TaskDateFieldProps) => (
   <View style={styles.fieldBlock}>
-    <Text style={styles.label}>Datum</Text>
+    <Text style={styles.label}>{label}</Text>
     <View style={styles.selector}>
       <Text style={styles.value}>{date ?? 'Kein Datum gesetzt'}</Text>
       <View style={styles.rowActions}>
-        <Button label="Aendern" variant="ghost" onPress={onTogglePicker} />
+        <Button label="Ändern" variant="ghost" onPress={onTogglePicker} />
         {date ? (
           <Button label="Entfernen" variant="ghost" onPress={() => onChangeDate(null)} />
         ) : null}

@@ -14,6 +14,7 @@ import { getTaskById } from '../db/repositories/tasksRepository';
 import { Session } from '../types/session';
 import { syncManager } from '../services/sync/syncManager';
 import { toSessionPushPayload } from '../services/sync/payloads';
+import { differenceInMinutes } from '../utils/date';
 import { useSyncStore } from './syncStore';
 
 interface SessionAssignmentOptions {
@@ -73,12 +74,13 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
       throw new Error('Name is required');
     }
 
+    const durationMinutes = differenceInMinutes(input.endTime, input.startTime);
     const createdSession = await createSession({
       title: input.title.trim(),
       date: input.date,
       startTime: input.startTime,
       endTime: input.endTime,
-      durationMinutes: 0,
+      durationMinutes,
       tagId: input.tagId || GENERAL_TAG_ID,
       taskId: null,
     });

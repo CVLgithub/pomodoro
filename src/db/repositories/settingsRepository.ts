@@ -2,6 +2,7 @@ import { DEFAULT_AUTO_SWITCH_TO_BREAKS, DEFAULT_BACKEND_URL } from '../../consta
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../../constants/notifications';
 import { NotificationPreferences } from '../../types/notifications';
 import { toLocalIsoString } from '../../utils/date';
+import { normalizeTagGroupNames } from '../../utils/tagGroups';
 import { getDatabase } from '../client';
 
 type SettingRow = {
@@ -14,6 +15,27 @@ const NOTIFY_ON_BREAK_END_KEY = 'notifyOnBreakEnd';
 const DAILY_FOCUS_GOAL_HOURS_KEY = 'dailyFocusGoalHours';
 const DAILY_FOCUS_GOAL_NOTIFIED_DATE_KEY = 'dailyFocusGoalNotifiedDate';
 const AUTO_SWITCH_TO_BREAKS_KEY = 'autoSwitchToBreaks';
+const TAG_GROUPS_KEY = 'tagGroups';
+
+const parseTagGroupsSetting = (value?: string): string[] => {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsedValue = JSON.parse(value);
+
+    if (!Array.isArray(parsedValue)) {
+      return [];
+    }
+
+    return normalizeTagGroupNames(
+      parsedValue.filter((entry): entry is string => typeof entry === 'string'),
+    );
+  } catch {
+    return [];
+  }
+};
 
 export const getBackendUrlSetting = async (): Promise<string> => {
   const db = await getDatabase();
@@ -108,6 +130,34 @@ export const saveAutoSwitchToBreaksSetting = async (value: boolean): Promise<boo
   );
 
   return value;
+};
+
+export const getTagGroupsSetting = async (): Promise<string[]> => {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<SettingRow>(
+    'SELECT value FROM app_settings WHERE key = ?;',
+    TAG_GROUPS_KEY,
+  );
+
+  return parseTagGroupsSetting(row?.value);
+};
+
+export const saveTagGroupsSetting = async (value: string[]): Promise<string[]> => {
+  const db = await getDatabase();
+  const normalizedGroups = normalizeTagGroupNames(value);
+
+  await db.runAsync(
+    `
+      INSERT INTO app_settings (key, value, updatedAt)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt;
+    `,
+    TAG_GROUPS_KEY,
+    JSON.stringify(normalizedGroups),
+    toLocalIsoString(),
+  );
+
+  return normalizedGroups;
 };
 
 export const saveNotificationPreferences = async (

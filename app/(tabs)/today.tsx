@@ -61,13 +61,13 @@ export default function TodayScreen() {
     <Screen
       title="Heute"
       subtitle="Schneller Überblick für den aktuellen Tag."
-      headerRight={<Button label="Settings" variant="ghost" onPress={() => router.push('/settings')} />}
+      headerRight={<Button label="Einstellungen" variant="ghost" onPress={() => router.push('/settings')} />}
     >
       <SectionCard>
-        <SectionHeader title="Aktiver Timer" subtitle={timer.status === 'idle' ? 'Noch nicht gestartet' : 'Läuft weiter nach Resume'} />
+        <SectionHeader title="Aktiver Timer" subtitle={timer.status === 'idle' ? 'Noch nicht gestartet' : 'Läuft weiter'} />
         <Text style={{ color: '#F5F7FA', fontSize: 42, fontWeight: '700' }}>{timer.formattedRemaining}</Text>
         <Text style={{ color: '#97A3B6' }}>
-          Heute fokussiert: {formatMinutesShort(focusMinutesToday)}
+          Heute erfasst: {formatMinutesShort(focusMinutesToday)}
         </Text>
         <View style={{ gap: 12 }}>
           <Button label="Timer ohne Aufgabe starten" onPress={handleStartFreeSession} />
@@ -85,16 +85,21 @@ export default function TodayScreen() {
         {todaysTasks.length === 0 ? (
           <EmptyState
             title="Keine Aufgaben für heute"
-            description="Lege eine Aufgabe an oder starte direkt eine freie Fokus-Session."
+            description="Lege eine Aufgabe an oder starte direkt eine freie Session."
           />
         ) : (
           todaysTasks.map((task) => (
             <TaskRow
-              key={task.id}
-              task={task}
-              tag={tagsById[task.tagId]}
-              onPress={() => router.push(`/task/${task.id}`)}
-              onToggle={(value) => void toggleTaskCompletion(task.id, value)}
+              key={task.key}
+              task={task.task}
+              tag={tagsById[task.task.tagId]}
+              onPress={() => router.push(`/task/${task.task.id}`)}
+              onToggle={(value) =>
+                void toggleTaskCompletion(task.task.id, value, { date: task.occurrenceDate })
+              }
+              isCompleted={task.isCompleted}
+              completedAt={task.completedAt}
+              displayDate={null}
             />
           ))
         )}

@@ -2,10 +2,19 @@ import { Platform } from 'react-native';
 
 import { TimerMode } from '../../types/timer';
 
+type ScheduledNotificationRequest = {
+  identifier: string;
+  content: {
+    title?: string | null;
+    data?: Record<string, unknown>;
+  };
+};
+
 type ExpoNotificationsModule = {
   AndroidNotificationPriority?: {
     HIGH: string;
   };
+  getAllScheduledNotificationsAsync?: () => Promise<ScheduledNotificationRequest[]>;
   setNotificationHandler?: (handler: {
     handleNotification: () => Promise<{
       shouldShowBanner: boolean;
@@ -27,9 +36,11 @@ type ExpoNotificationsModule = {
   getPermissionsAsync: () => Promise<{ granted: boolean; ios?: { status?: number } }>;
   requestPermissionsAsync: () => Promise<{ granted: boolean; ios?: { status?: number } }>;
   scheduleNotificationAsync: (request: {
+    identifier?: string;
     content: {
       title: string;
       body: string;
+      data?: Record<string, unknown>;
       sound?: boolean;
       priority?: string;
     };
@@ -41,6 +52,13 @@ type ExpoNotificationsModule = {
 let cachedModule: ExpoNotificationsModule | null | undefined;
 let isConfigured = false;
 let scheduledTimerNotificationId: string | null = null;
+
+const TIMER_COMPLETION_NOTIFICATION_IDENTIFIER = 'timer-completion';
+const TIMER_COMPLETION_NOTIFICATION_KIND = 'timer-completion';
+const TIMER_COMPLETION_NOTIFICATION_TITLES = new Set([
+  'Session beendet',
+  'Pause beendet',
+]);
 
 const getExpoNotificationsModule = (): ExpoNotificationsModule | null => {
   if (cachedModule !== undefined) {
@@ -89,15 +107,51 @@ const ensureConfigured = async (): Promise<ExpoNotificationsModule | null> => {
 const getTimerNotificationContent = (mode: TimerMode) => {
   if (mode === 'focus') {
     return {
-      title: 'Fokus-Session beendet',
-      body: 'Zeit für eine Pause.',
+      title: 'Session beendet',
+      body: 'Zeit f\u00fcr eine Pause.',
     };
   }
 
   return {
     title: 'Pause beendet',
-    body: 'Du kannst mit der nächsten Fokus-Session starten.',
+    body: 'Du kannst mit der n\u00e4chsten Session starten.',
   };
+};
+
+const isTimerCompletionNotification = (request: ScheduledNotificationRequest): boolean => {
+  if (request.identifier === TIMER_COMPLETION_NOTIFICATION_IDENTIFIER) {
+    return true;
+  }
+
+  if (request.content.data?.kind === TIMER_COMPLETION_NOTIFICATION_KIND) {
+    return true;
+  }
+
+  return request.content.title ? TIMER_COMPLETION_NOTIFICATION_TITLES.has(request.content.title) : false;
+};
+
+const cancelKnownTimerCompletionNotifications = async (
+  notifications: ExpoNotificationsModule,
+): Promise<void> => {
+  const identifiersToCancel = new Set<string>();
+
+  if (scheduledTimerNotificationId) {
+    identifiersToCancel.add(scheduledTimerNotificationId);
+  }
+
+  identifiersToCancel.add(TIMER_COMPLETION_NOTIFICATION_IDENTIFIER);
+
+  const scheduledNotifications = await notifications.getAllScheduledNotificationsAsync?.();
+
+  scheduledNotifications
+    ?.filter(isTimerCompletionNotification)
+    .forEach((request) => identifiersToCancel.add(request.identifier));
+
+  for (const identifier of identifiersToCancel) {
+    await notifications.cancelScheduledNotificationAsync(identifier);
+  }
+
+  scheduledTimerNotificationId = null;
 };
 
 export const notificationService = {
@@ -137,15 +191,16 @@ export const notificationService = {
       return;
     }
 
-    if (scheduledTimerNotificationId) {
-      await notifications.cancelScheduledNotificationAsync(scheduledTimerNotificationId);
-      scheduledTimerNotificationId = null;
-    }
+    await cancelKnownTimerCompletionNotifications(notifications);
 
     const content = getTimerNotificationContent(mode);
     scheduledTimerNotificationId = await notifications.scheduleNotificationAsync({
+      identifier: TIMER_COMPLETION_NOTIFICATION_IDENTIFIER,
       content: {
         ...content,
+        data: {
+          kind: TIMER_COMPLETION_NOTIFICATION_KIND,
+        },
         sound: true,
         priority: notifications.AndroidNotificationPriority?.HIGH,
       },
@@ -164,12 +219,7 @@ export const notificationService = {
       return;
     }
 
-    if (!scheduledTimerNotificationId) {
-      return;
-    }
-
-    await notifications.cancelScheduledNotificationAsync(scheduledTimerNotificationId);
-    scheduledTimerNotificationId = null;
+    await cancelKnownTimerCompletionNotifications(notifications);
   },
   sendDailyGoalReachedNotification: async (hours: number): Promise<void> => {
     const notifications = await ensureConfigured();

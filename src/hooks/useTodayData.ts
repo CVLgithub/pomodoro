@@ -5,9 +5,14 @@ import { useSessionsStore } from '../store/sessionsStore';
 import { useTasksStore } from '../store/tasksStore';
 import { useTimerStore } from '../store/timerStore';
 import { getTodayDateKey } from '../utils/date';
+import {
+  buildTaskOccurrenceCompletionLookup,
+  getResolvedTaskOccurrencesForDate,
+} from '../utils/taskRecurrence';
 
 export const useTodayData = () => {
   const tasks = useTasksStore((state) => state.tasks);
+  const occurrenceCompletions = useTasksStore((state) => state.occurrenceCompletions);
   const sessions = useSessionsStore((state) => state.sessions);
   const timer = useTimerStore(useShallow((state) => ({
     activeMode: state.activeMode,
@@ -18,7 +23,8 @@ export const useTodayData = () => {
 
   return useMemo(() => {
     const todayKey = getTodayDateKey();
-    const todaysTasks = tasks.filter((task) => task.date === todayKey);
+    const occurrenceLookup = buildTaskOccurrenceCompletionLookup(occurrenceCompletions);
+    const todaysTasks = getResolvedTaskOccurrencesForDate(tasks, todayKey, occurrenceLookup);
     const todaysSessions = sessions.filter((session) => session.date === todayKey);
     const focusMinutesToday = todaysSessions.reduce(
       (total, session) => total + session.durationMinutes,
@@ -32,5 +38,5 @@ export const useTodayData = () => {
       focusMinutesToday,
       activeTimer: timer,
     };
-  }, [sessions, tasks, timer]);
+  }, [occurrenceCompletions, sessions, tasks, timer]);
 };

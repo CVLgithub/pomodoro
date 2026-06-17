@@ -43,7 +43,7 @@ export const timerEngine = {
     updatedAt: toLocalIsoString(),
   }),
   getDurationSeconds: durationForMode,
-  getRemainingSeconds: (state: TimerStateRecord, now = new Date()): number => {
+  getRemainingSeconds: (state: TimerStateRecord, now: string | Date = new Date()): number => {
     if (state.status === 'running' && state.expectedEndAt) {
       return Math.max(0, differenceInSeconds(state.expectedEndAt, now));
     }
@@ -54,7 +54,7 @@ export const timerEngine = {
 
     return durationForMode(state, state.activeMode);
   },
-  getElapsedSeconds: (state: TimerStateRecord, now = new Date()): number =>
+  getElapsedSeconds: (state: TimerStateRecord, now: string | Date = new Date()): number =>
     Math.max(
       0,
       durationForMode(state, state.activeMode) - timerEngine.getRemainingSeconds(state, now),

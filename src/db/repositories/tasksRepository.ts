@@ -1,8 +1,15 @@
 import { GENERAL_TAG_ID } from '../../constants/config';
 import { Task, CreateTaskInput, UpdateTaskInput } from '../../types/task';
 import { toLocalIsoString } from '../../utils/date';
+import {
+  isTaskRecurring,
+  normalizeTaskRecurrence,
+  parseTaskRecurrenceDays,
+  serializeTaskRecurrenceDays,
+} from '../../utils/taskRecurrence';
 import { createUuid } from '../../utils/uuid';
 import { getDatabase } from '../client';
+import { deleteTaskOccurrenceCompletionsByTaskId } from './taskOccurrenceCompletionsRepository';
 
 type TaskRow = {
   id: string;
@@ -10,25 +17,38 @@ type TaskRow = {
   date: string | null;
   tagId: string;
   isCompleted: number;
+  completedAt: string | null;
+  recurrenceType: string;
+  recurrenceDays: string;
   createdAt: string;
   updatedAt: string;
 };
 
-const mapTaskRow = (row: TaskRow): Task => ({
-  id: row.id,
-  title: row.title,
-  date: row.date,
-  tagId: row.tagId,
-  isCompleted: Boolean(row.isCompleted),
-  createdAt: row.createdAt,
-  updatedAt: row.updatedAt,
-});
+const mapTaskRow = (row: TaskRow): Task => {
+  const recurrence = normalizeTaskRecurrence(
+    row.recurrenceType,
+    parseTaskRecurrenceDays(row.recurrenceDays),
+  );
+
+  return {
+    id: row.id,
+    title: row.title,
+    date: row.date,
+    tagId: row.tagId,
+    isCompleted: Boolean(row.isCompleted),
+    completedAt: row.completedAt,
+    recurrenceType: recurrence.recurrenceType,
+    recurrenceDays: recurrence.recurrenceDays,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+};
 
 export const listTasks = async (): Promise<Task[]> => {
   const db = await getDatabase();
   const rows = await db.getAllAsync<TaskRow>(
     `
-      SELECT id, title, date, tagId, isCompleted, createdAt, updatedAt
+      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
       FROM tasks
       ORDER BY isCompleted ASC, date IS NULL ASC, date ASC, updatedAt DESC;
     `,
@@ -41,7 +61,7 @@ export const getTaskById = async (id: string): Promise<Task | null> => {
   const db = await getDatabase();
   const row = await db.getFirstAsync<TaskRow>(
     `
-      SELECT id, title, date, tagId, isCompleted, createdAt, updatedAt
+      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
       FROM tasks
       WHERE id = ?;
     `,
@@ -54,26 +74,38 @@ export const getTaskById = async (id: string): Promise<Task | null> => {
 export const createTask = async (input: CreateTaskInput): Promise<Task> => {
   const db = await getDatabase();
   const now = toLocalIsoString();
+  const recurrence = normalizeTaskRecurrence(
+    input.recurrenceType,
+    input.recurrenceDays,
+  );
   const task: Task = {
     id: createUuid(),
     title: input.title.trim(),
     date: input.date ?? null,
     tagId: input.tagId ?? GENERAL_TAG_ID,
     isCompleted: false,
+    completedAt: recurrence.recurrenceType === 'weekly' ? null : input.completedAt ?? null,
+    recurrenceType: recurrence.recurrenceType,
+    recurrenceDays: recurrence.recurrenceDays,
     createdAt: now,
     updatedAt: now,
   };
 
   await db.runAsync(
     `
-      INSERT INTO tasks (id, title, date, tagId, isCompleted, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?);
+      INSERT INTO tasks (
+        id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
     task.id,
     task.title,
     task.date,
     task.tagId,
     task.isCompleted ? 1 : 0,
+    task.completedAt,
+    task.recurrenceType,
+    serializeTaskRecurrenceDays(task.recurrenceDays),
     task.createdAt,
     task.updatedAt,
   );
@@ -92,28 +124,69 @@ export const updateTask = async (
     throw new Error('Task not found');
   }
 
+  const nextRecurrence = normalizeTaskRecurrence(
+    input.recurrenceType ?? existingTask.recurrenceType,
+    input.recurrenceDays ?? existingTask.recurrenceDays,
+  );
+  const nextDate = input.date !== undefined ? input.date : existingTask.date;
+  const shouldTreatAsRecurring = nextRecurrence.recurrenceType === 'weekly';
   const updatedTask: Task = {
     ...existingTask,
     title: input.title?.trim() ?? existingTask.title,
-    date: input.date !== undefined ? input.date : existingTask.date,
+    date: nextDate,
     tagId: input.tagId ?? existingTask.tagId,
-    isCompleted: input.isCompleted ?? existingTask.isCompleted,
+    isCompleted: shouldTreatAsRecurring
+      ? false
+      : input.isCompleted ?? existingTask.isCompleted,
+    completedAt:
+      shouldTreatAsRecurring
+        ? null
+        : input.completedAt !== undefined
+        ? input.completedAt
+        : input.isCompleted === undefined || input.isCompleted === existingTask.isCompleted
+          ? existingTask.completedAt
+          : input.isCompleted
+            ? toLocalIsoString()
+            : null,
+    recurrenceType: nextRecurrence.recurrenceType,
+    recurrenceDays: nextRecurrence.recurrenceDays,
     updatedAt: toLocalIsoString(),
   };
+
+  const recurrenceSettingsChanged =
+    existingTask.recurrenceType !== updatedTask.recurrenceType ||
+    JSON.stringify(existingTask.recurrenceDays) !== JSON.stringify(updatedTask.recurrenceDays) ||
+    (updatedTask.date !== existingTask.date &&
+      (isTaskRecurring(existingTask) || isTaskRecurring(updatedTask)));
 
   await db.runAsync(
     `
       UPDATE tasks
-      SET title = ?, date = ?, tagId = ?, isCompleted = ?, updatedAt = ?
+      SET
+        title = ?,
+        date = ?,
+        tagId = ?,
+        isCompleted = ?,
+        completedAt = ?,
+        recurrenceType = ?,
+        recurrenceDays = ?,
+        updatedAt = ?
       WHERE id = ?;
     `,
     updatedTask.title,
     updatedTask.date,
     updatedTask.tagId,
     updatedTask.isCompleted ? 1 : 0,
+    updatedTask.completedAt,
+    updatedTask.recurrenceType,
+    serializeTaskRecurrenceDays(updatedTask.recurrenceDays),
     updatedTask.updatedAt,
     id,
   );
+
+  if (recurrenceSettingsChanged) {
+    await deleteTaskOccurrenceCompletionsByTaskId(id);
+  }
 
   return updatedTask;
 };
@@ -138,7 +211,7 @@ export const getTasksByDate = async (dateKey: string): Promise<Task[]> => {
   const db = await getDatabase();
   const rows = await db.getAllAsync<TaskRow>(
     `
-      SELECT id, title, date, tagId, isCompleted, createdAt, updatedAt
+      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
       FROM tasks
       WHERE date = ?
       ORDER BY isCompleted ASC, updatedAt DESC;

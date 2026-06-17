@@ -5,6 +5,7 @@ import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
 import { Tag } from '../../types/tag';
 import { Task } from '../../types/task';
+import { getTaskScheduleLabel } from '../../utils/taskRecurrence';
 import { Button } from '../ui/Button';
 import { ModalSheet } from '../ui/ModalSheet';
 import { SectionCard } from '../ui/SectionCard';
@@ -162,7 +163,9 @@ export const TaskAssignmentCard = ({
                       style={styles.modalRow}
                     >
                       <Text style={styles.modalTitle}>{task.title}</Text>
-                      <Text style={styles.modalMeta}>{task.date ? task.date : 'Ohne Datum'}</Text>
+                      <Text style={styles.modalMeta}>
+                        {getTaskScheduleLabel(task) ?? 'Ohne Datum'}
+                      </Text>
                     </Pressable>
                   ))}
                 </View>
@@ -197,7 +200,9 @@ export const TaskAssignmentCard = ({
                       style={[styles.modalRow, styles.modalRowCompleted]}
                     >
                       <Text style={[styles.modalTitle, styles.modalTitleCompleted]}>{task.title}</Text>
-                      <Text style={styles.modalMeta}>{task.date ? task.date : 'Ohne Datum'}</Text>
+                      <Text style={styles.modalMeta}>
+                        {getTaskScheduleLabel(task) ?? 'Ohne Datum'}
+                      </Text>
                     </Pressable>
                   ))}
                 </View>

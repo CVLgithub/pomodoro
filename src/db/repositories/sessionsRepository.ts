@@ -5,7 +5,7 @@ import {
   UpdateSessionAssignmentInput,
   UpdateSessionInput,
 } from '../../types/session';
-import { differenceInMinutes, toLocalIsoString } from '../../utils/date';
+import { toLocalIsoString } from '../../utils/date';
 import { createUuid } from '../../utils/uuid';
 import { getDatabase } from '../client';
 import { deleteSyncQueueItemsByEntity } from './syncQueueRepository';
@@ -79,14 +79,13 @@ export const getLatestSession = async (): Promise<Session | null> => {
 
 export const createSession = async (input: CreateSessionInput): Promise<Session> => {
   const db = await getDatabase();
-  const durationMinutes = differenceInMinutes(input.endTime, input.startTime);
   const session: Session = {
     id: createUuid(),
     title: input.title,
     date: input.date,
     startTime: input.startTime,
     endTime: input.endTime,
-    durationMinutes,
+    durationMinutes: input.durationMinutes,
     taskId: input.taskId ?? null,
     tagId: input.tagId,
     syncStatus: input.syncStatus ?? 'pending',

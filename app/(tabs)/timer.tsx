@@ -57,8 +57,8 @@ export default function TimerScreen() {
   return (
     <Screen
       title="Timer"
-      subtitle="Starte den Pomodoro Timer."
-      headerRight={<Button label="Settings" variant="ghost" onPress={() => router.push('/settings')} />}
+      subtitle="Starte und steuere deine aktuelle Session."
+      headerRight={<Button label="Einstellungen" variant="ghost" onPress={() => router.push('/settings')} />}
     >
       <ModeTabs
         value={timer.activeMode}
@@ -77,8 +77,8 @@ export default function TimerScreen() {
           title="Steuerung"
           subtitle={
             timer.activeMode === 'longBreak' && timer.status === 'idle'
-              ? 'Vier Fokus-Sessions abgeschlossen. Lange Pause ist bereit.'
-              : 'Pausen starten nie automatisch.'
+              ? 'Die lange Pause ist bereit.'
+              : 'Start, Pause und Ende steuerst du hier.'
           }
         />
         <View style={{ gap: 12 }}>
@@ -120,14 +120,14 @@ export default function TimerScreen() {
       />
 
       <SectionCard>
-        <SectionHeader title="Dauer" subtitle="Stelle die Zeiten ein." />
+        <SectionHeader title="Dauer" subtitle="Passe die Timer-Dauer an." />
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <DurationWheelPicker
             label="Fokus"
             value={timer.focusMinutes}
             disabled={timer.status !== 'idle'}
             onChange={(value) =>
-              void runSafely(() => setDurations({ focusMinutes: value }), 'Fokusdauer konnte nicht gespeichert werden')
+              void runSafely(() => setDurations({ focusMinutes: value }), 'Sessiondauer konnte nicht gespeichert werden')
             }
           />
           <DurationWheelPicker
@@ -153,7 +153,7 @@ export default function TimerScreen() {
 
       {latestSession ? (
         <TaskAssignmentCard
-          title="Letzte Fokus-Session"
+          title="Letzte Session"
           subtitle={`${formatTimeLabel(latestSession.startTime)} - ${formatTimeLabel(latestSession.endTime)}`}
           tasks={tasks}
           tags={tags}

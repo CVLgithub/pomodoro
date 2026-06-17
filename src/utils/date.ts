@@ -1,4 +1,9 @@
 const pad = (value: number): string => String(value).padStart(2, '0');
+const fullDateFormatter = new Intl.DateTimeFormat('de-DE', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
 
 export const toLocalIsoString = (date = new Date()): string => {
   const offsetMinutes = -date.getTimezoneOffset();
@@ -22,12 +27,24 @@ export const parseDateInput = (value?: string | Date | null): Date => {
   return value instanceof Date ? value : new Date(value);
 };
 
+export const parseDateKey = (dateKey: string): Date => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+};
+
 export const formatDateKey = (value?: string | Date | null): string => {
   const date = parseDateInput(value);
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
 
 export const getTodayDateKey = (): string => formatDateKey(new Date());
+
+export const addDays = (value: string | Date, days: number): Date => {
+  const base = typeof value === 'string' ? parseDateKey(value) : parseDateInput(value);
+  const next = new Date(base);
+  next.setDate(next.getDate() + days);
+  return next;
+};
 
 export const addMinutes = (value: string | Date, minutes: number): Date => {
   const base = parseDateInput(value);
@@ -62,6 +79,9 @@ export const formatTimeLabel = (value: string | Date): string => {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+export const formatFullDateLabel = (value: string | Date): string =>
+  fullDateFormatter.format(parseDateInput(value));
+
 export const getWeekStart = (value = new Date()): Date => {
   const date = new Date(value);
   const currentDay = date.getDay();
@@ -78,11 +98,18 @@ export const getMonthStart = (value = new Date()): Date => {
   return date;
 };
 
+export const getMonthEnd = (value = new Date()): Date => {
+  const date = getMonthStart(value);
+  date.setMonth(date.getMonth() + 1, 0);
+  date.setHours(23, 59, 59, 999);
+  return date;
+};
+
 export const isDateWithinRange = (
   dateKey: string,
   start: Date,
   end: Date,
 ): boolean => {
-  const value = new Date(`${dateKey}T00:00:00`);
+  const value = parseDateKey(dateKey);
   return value.getTime() >= start.getTime() && value.getTime() <= end.getTime();
 };

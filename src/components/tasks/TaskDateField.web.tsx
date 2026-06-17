@@ -11,6 +11,7 @@ interface TaskDateFieldProps {
   isPickerVisible: boolean;
   onTogglePicker: () => void;
   onChangeDate: (date: string | null) => void;
+  label?: string;
 }
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -46,6 +47,7 @@ export const TaskDateField = ({
   isPickerVisible,
   onTogglePicker,
   onChangeDate,
+  label = 'Datum',
 }: TaskDateFieldProps) => {
   const [draft, setDraft] = useState(date ?? '');
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -75,12 +77,12 @@ export const TaskDateField = ({
 
   return (
     <View style={styles.fieldBlock}>
-      <Text style={styles.label}>Datum</Text>
+      <Text style={styles.label}>{label}</Text>
       <View style={styles.selector}>
         <Text style={styles.value}>{date ?? 'Kein Datum gesetzt'}</Text>
         <View style={styles.rowActions}>
           <Button
-            label={isPickerVisible ? 'Schliessen' : 'Aendern'}
+            label={isPickerVisible ? 'Schließen' : 'Ändern'}
             variant="ghost"
             onPress={isPickerVisible ? handleCancel : onTogglePicker}
           />
@@ -92,7 +94,7 @@ export const TaskDateField = ({
       {isPickerVisible ? (
         <View style={styles.editor}>
           <TextField
-            label="Datum"
+            label={label}
             value={draft}
             onChangeText={(value) => {
               setDraft(value);
@@ -106,7 +108,7 @@ export const TaskDateField = ({
             helperText={errorText ?? 'Format YYYY-MM-DD. Leer lassen entfernt das Datum.'}
           />
           <View style={styles.rowActions}>
-            <Button label="Uebernehmen" onPress={handleApply} />
+            <Button label="Übernehmen" onPress={handleApply} />
             <Button label="Abbrechen" variant="secondary" onPress={handleCancel} />
           </View>
         </View>

@@ -22,7 +22,13 @@ import { useSyncStore } from '../src/store/syncStore';
 import { useTagsStore } from '../src/store/tagsStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { NotificationPreferences } from '../src/types/notifications';
+import type { Tag } from '../src/types/tag';
 import { addMinutes, formatDateKey, formatTimeLabel, toLocalIsoString } from '../src/utils/date';
+import {
+  buildTagGroupOptions,
+  getTagGroupKey,
+  sortTagsByGroupAndName,
+} from '../src/utils/tagGroups';
 
 const normalizeBackendUrl = (value: string): string => value.trim().replace(/\/+$/, '');
 const DATE_INPUT_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -74,6 +80,12 @@ const getManualSessionDefaults = () => {
     endTime: formatTimeLabel(now),
     tagId: GENERAL_TAG_ID,
   };
+};
+
+type SettingsTagGroup = {
+  groupKey: string;
+  groupLabel: string;
+  tags: Tag[];
 };
 
 const NotificationToggleRow = ({
@@ -138,17 +150,16 @@ const NotificationSettingsCard = memo(function NotificationSettingsCard({
     <SectionCard>
       <SectionHeader
         title="Benachrichtigungen"
-        subtitle="Steuert Erinnerungen für Sessionende, Pausenende und Tagesziele."
+        subtitle="Lege fest, wann du erinnert werden möchtest."
       />
       {!notificationsSupported ? (
         <Text style={styles.warningText}>
-          `expo-notifications` ist noch nicht installiert. Führe `npx expo install
-          expo-notifications` aus, damit System-Benachrichtigungen verfügbar sind.
+          Benachrichtigungen sind auf diesem Gerät noch nicht verfügbar.
         </Text>
       ) : null}
       <NotificationToggleRow
         label="Sessionende"
-        description="Benachrichtigt dich, wenn eine Fokus-Session abgeschlossen ist."
+        description="Benachrichtigt dich, wenn eine Session abgeschlossen ist."
         value={draftPreferences.notifyOnFocusEnd}
         onValueChange={(value) =>
           updatePreferences({
@@ -171,7 +182,7 @@ const NotificationSettingsCard = memo(function NotificationSettingsCard({
       <View style={styles.goalSection}>
         <Text style={styles.preferenceLabel}>Tagesziel</Text>
         <Text style={styles.preferenceDescription}>
-          Benachrichtigt dich, sobald du an einem Tag die gewählte Fokuszeit erreicht hast.
+          Benachrichtigt dich, sobald du dein Ziel für den Tag erreicht hast.
         </Text>
         <View style={styles.goalOptions}>
           <Button
@@ -212,6 +223,7 @@ export default function SettingsScreen() {
   const backendUrl = useSettingsStore((state) => state.backendUrl);
   const notificationPreferences = useSettingsStore((state) => state.notificationPreferences);
   const autoSwitchToBreaks = useSettingsStore((state) => state.autoSwitchToBreaks);
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
   const saveBackendUrl = useSettingsStore((state) => state.saveBackendUrl);
   const saveNotificationPreferences = useSettingsStore((state) => state.saveNotificationPreferences);
   const saveAutoSwitchToBreaks = useSettingsStore((state) => state.saveAutoSwitchToBreaks);
@@ -263,10 +275,20 @@ export default function SettingsScreen() {
   const collapsedQueueTitle = useMemo(
     () =>
       collapsedQueueItems.every((item) => item.status === 'synced')
-        ? 'Erfolgreich synchronisierte Einträge'
-        : 'Weitere Queue-Einträge',
+        ? 'Bereits erledigte Einträge'
+        : 'Weitere Einträge',
     [collapsedQueueItems],
   );
+
+  const groupedTags = useMemo<SettingsTagGroup[]>(() => {
+    const sortedTags = sortTagsByGroupAndName(tags);
+
+    return buildTagGroupOptions(tags, tagGroups).map((group) => ({
+      groupKey: group.key,
+      groupLabel: group.label,
+      tags: sortedTags.filter((tag) => getTagGroupKey(tag.groupName) === group.key),
+    }));
+  }, [tagGroups, tags]);
 
   const runSyncSafely = async (work: () => Promise<void>, title: string) => {
     try {
@@ -283,7 +305,7 @@ export default function SettingsScreen() {
       await saveBackendUrl(backendUrlInput);
     } catch (error) {
       Alert.alert(
-        'Backend-URL konnte nicht gespeichert werden',
+        'Adresse konnte nicht gespeichert werden',
         error instanceof Error ? error.message : 'Unbekannter Fehler',
       );
     } finally {
@@ -337,7 +359,7 @@ export default function SettingsScreen() {
         tagId: manualSessionDraft.tagId,
       });
       setManualSessionDraft(getManualSessionDefaults());
-      Alert.alert('Session gespeichert', 'Die vergangene Session wurde hinzugefugt.');
+      Alert.alert('Session gespeichert', 'Die vergangene Session wurde hinzugefügt.');
     } catch (error) {
       Alert.alert(
         'Session konnte nicht gespeichert werden',
@@ -400,21 +422,21 @@ export default function SettingsScreen() {
 
   return (
     <Screen
-      title="Settings"
-      subtitle="Lokale Quelle, Push-only Synchronisierung."
+      title="Einstellungen"
+      subtitle="Passe Timer, Tags und App-Verhalten an."
       headerRight={<Button label="Schließen" variant="ghost" onPress={() => router.back()} />}
     >
       <SectionCard>
-        <SectionHeader title="Backend" subtitle="Zentrale Konfiguration für Push-Requests" />
+        <SectionHeader title="Verbindung" subtitle="Lege fest, welche Adresse die App verwendet." />
         <TextField
-          label="Backend-URL"
+          label="Adresse"
           value={backendUrlInput}
           onChangeText={setBackendUrlInput}
           placeholder="https://example.com"
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
-          helperText="Die URL wird für alle neuen Push-Requests verwendet."
+          helperText="Diese Adresse wird für Import und Übertragung verwendet."
         />
         <View style={styles.actionRow}>
           <Button
@@ -429,7 +451,7 @@ export default function SettingsScreen() {
             disabled={isSavingBackendUrl}
           />
         </View>
-        <Text style={styles.meta}>Aktiv: {backendUrl}</Text>
+        <Text style={styles.meta}>Aktuelle Adresse: {backendUrl}</Text>
       </SectionCard>
 
       <NotificationSettingsCard
@@ -440,11 +462,11 @@ export default function SettingsScreen() {
       <SectionCard>
         <SectionHeader
           title="Timer"
-          subtitle="Steuert, wie nach abgeschlossenen Fokus-Sessions weitergeschaltet wird."
+          subtitle="Lege fest, was nach einer abgeschlossenen Session passiert."
         />
         <NotificationToggleRow
           label="Automatisch zu Pausen wechseln"
-          description="Wenn aktiv, springt der Timer nach Fokus-Sessions automatisch zur kurzen oder langen Pause."
+          description="Wenn aktiv, springt der Timer danach automatisch zur kurzen oder langen Pause."
           value={autoSwitchToBreaks}
           onValueChange={(value) => {
             void saveAutoSwitchToBreaks(value).catch((error) => {
@@ -460,27 +482,40 @@ export default function SettingsScreen() {
       <SectionCard>
         <SectionHeader
           title="Tags"
-          subtitle="Allgemein bleibt geschützt, weitere Tags sind editierbar."
+          subtitle="Erstelle Tags und ordne sie Gruppen zu."
           action={<Button label="Neu" variant="secondary" onPress={() => router.push('/tag/new')} />}
         />
-        {tags.length <= 1 ? (
+        {tags.length <= 1 && tagGroups.length === 0 ? (
           <EmptyState
             title="Nur Allgemein vorhanden"
             description="Lege weitere Tags an, um Aufgaben und freie Sessions farblich zu strukturieren."
           />
         ) : null}
         <View style={styles.list}>
-          {tags.map((tag) => (
-            <Pressable
-              key={tag.id}
-              onPress={() => router.push(`/tag/${tag.id}`)}
-              style={styles.row}
-            >
-              <TagPill label={tag.name} color={tag.color} />
-              <Text style={styles.rowMeta}>
-                {tag.id === GENERAL_TAG_ID ? 'Standard' : 'Bearbeiten'}
-              </Text>
-            </Pressable>
+          {groupedTags.map((group) => (
+            <View key={group.groupKey} style={styles.tagListGroup}>
+              <View style={styles.tagListGroupHeader}>
+                <Text style={styles.tagListGroupTitle}>{group.groupLabel}</Text>
+                <Text style={styles.tagListGroupCount}>
+                  {group.tags.length} {group.tags.length === 1 ? 'Tag' : 'Tags'}
+                </Text>
+              </View>
+              <View style={styles.tagListGroupRows}>
+                {group.tags.length > 0 ? (
+                  group.tags.map((tag) => (
+                    <Pressable
+                      key={tag.id}
+                      onPress={() => router.push(`/tag/${tag.id}`)}
+                      style={styles.row}
+                    >
+                      <TagPill label={tag.name} color={tag.color} />
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text style={styles.emptyGroupText}>Noch keine Tags in dieser Gruppe.</Text>
+                )}
+              </View>
+            </View>
           ))}
         </View>
       </SectionCard>
@@ -488,7 +523,7 @@ export default function SettingsScreen() {
       <SectionCard>
         <SectionHeader
           title="Vergangene Session"
-          subtitle="Erfasst eine bereits abgeschlossene Fokus-Session manuell."
+          subtitle="Erfasse eine bereits abgeschlossene Session manuell."
         />
         <TextField
           label="Name"
@@ -592,8 +627,8 @@ export default function SettingsScreen() {
 
       <SectionCard>
         <SectionHeader
-          title="Downsync"
-          subtitle="Öffnet die manuelle Server-Vorschau für Einträge, die lokal fehlen oder von deiner lokalen Version abweichen."
+          title="Import"
+          subtitle="Prüfe neue oder geänderte Einträge und übernimm sie gezielt."
           action={
             <Button
               label="Öffnen"
@@ -603,26 +638,26 @@ export default function SettingsScreen() {
           }
         />
         <Text style={styles.meta}>
-          Jeder Server-Eintrag kann dort einzeln bestätigt und lokal übernommen werden.
+          Du entscheidest dort für jeden Eintrag einzeln.
         </Text>
       </SectionCard>
 
       <SectionCard>
         <SectionHeader
-          title="Sync-Queue"
-          subtitle="Fehlgeschlagene Pushes bleiben direkt sichtbar, erfolgreiche Einträge lassen sich bei Bedarf ausklappen."
+          title="Ausstehende Übertragungen"
+          subtitle="Einträge, die noch einmal gesendet werden müssen."
           action={
             <Button
               label="Alle senden"
               variant="secondary"
-              onPress={() => void runSyncSafely(retryAll, 'Queue konnte nicht gesendet werden')}
+              onPress={() => void runSyncSafely(retryAll, 'Einträge konnten nicht gesendet werden')}
             />
           }
         />
         {queueItems.length === 0 ? (
           <EmptyState
-            title="Keine Queue-Einträge"
-            description="Sobald Requests gesendet werden, erscheinen Status und Payload hier."
+            title="Nichts ausstehend"
+            description="Hier erscheint nur etwas, wenn ein Senden nicht geklappt hat."
           />
         ) : (
           <>
@@ -779,17 +814,44 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   list: {
+    gap: spacing.md,
+  },
+  tagListGroup: {
     gap: spacing.sm,
+  },
+  tagListGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tagListGroupTitle: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  tagListGroupCount: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagListGroupRows: {
+    gap: spacing.xs,
+    paddingLeft: spacing.md,
+  },
+  emptyGroupText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    paddingVertical: spacing.sm,
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.md,
     paddingVertical: spacing.sm,
-  },
-  rowMeta: {
-    color: colors.textMuted,
-    fontSize: 13,
   },
 });

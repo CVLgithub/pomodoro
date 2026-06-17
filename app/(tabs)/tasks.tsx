@@ -1,40 +1,201 @@
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { TaskGroupSection } from '../../src/components/tasks/TaskGroupSection';
-import { colors } from '../../src/constants/colors';
-import { radii, spacing } from '../../src/constants/spacing';
 import { Button } from '../../src/components/ui/Button';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { Screen } from '../../src/components/ui/Screen';
+import { colors } from '../../src/constants/colors';
+import { radii, spacing } from '../../src/constants/spacing';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
+import { useUiStore } from '../../src/store/uiStore';
+import { Tag } from '../../src/types/tag';
+import { Task } from '../../src/types/task';
+import {
+  getTagGroupKey,
+  getTagGroupLabel,
+  sortTagsByGroupAndName,
+} from '../../src/utils/tagGroups';
+import { isTaskRecurring } from '../../src/utils/taskRecurrence';
+
+type TasksByTag = {
+  tag: Tag;
+  tasks: Task[];
+};
+
+type TasksByTagGroup = {
+  groupKey: string;
+  groupLabel: string;
+  entries: TasksByTag[];
+  taskCount: number;
+};
+
+const buildTasksByTagGroups = (
+  tags: Tag[],
+  tasks: Task[],
+): TasksByTagGroup[] => {
+  const sortedTags = sortTagsByGroupAndName(tags);
+  const tasksByTagId = new Map<string, Task[]>();
+
+  for (const task of tasks) {
+    const entries = tasksByTagId.get(task.tagId) ?? [];
+    entries.push(task);
+    tasksByTagId.set(task.tagId, entries);
+  }
+
+  const groups: TasksByTagGroup[] = [];
+
+  for (const tag of sortedTags) {
+    const groupedTasks = tasksByTagId.get(tag.id) ?? [];
+    if (groupedTasks.length === 0) {
+      continue;
+    }
+
+    const groupKey = getTagGroupKey(tag.groupName);
+    const groupLabel = getTagGroupLabel(tag.groupName);
+    const existingGroup = groups.find((entry) => entry.groupKey === groupKey);
+
+    if (existingGroup) {
+      existingGroup.entries.push({ tag, tasks: groupedTasks });
+      existingGroup.taskCount += groupedTasks.length;
+      continue;
+    }
+
+    groups.push({
+      groupKey,
+      groupLabel,
+      entries: [{ tag, tasks: groupedTasks }],
+      taskCount: groupedTasks.length,
+    });
+  }
+
+  return groups;
+};
 
 export default function TasksScreen() {
   const router = useRouter();
   const tasks = useTasksStore((state) => state.tasks);
   const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion);
   const tags = useTagsStore((state) => state.tags);
+  const collapsedTaskTagGroups = useUiStore((state) => state.collapsedTaskTagGroups);
+  const toggleTaskTagGroupCollapsed = useUiStore(
+    (state) => state.toggleTaskTagGroupCollapsed,
+  );
 
   const tagsById = useMemo(
     () => Object.fromEntries(tags.map((tag) => [tag.id, tag])),
     [tags],
   );
 
-  const openGroups = tags
-    .map((tag) => ({
-      tag,
-      tasks: tasks.filter((task) => task.tagId === tag.id && !task.isCompleted),
-    }))
-    .filter((group) => group.tasks.length > 0);
+  const openTagGroups = useMemo(
+    () =>
+      buildTasksByTagGroups(
+        tags,
+        tasks.filter((task) => !task.isCompleted),
+      ),
+    [tags, tasks],
+  );
 
-  const completedGroups = tags
-    .map((tag) => ({
-      tag,
-      tasks: tasks.filter((task) => task.tagId === tag.id && task.isCompleted),
-    }))
-    .filter((group) => group.tasks.length > 0);
+  const completedTagGroups = useMemo(
+    () =>
+      buildTasksByTagGroups(
+        tags,
+        tasks.filter((task) => task.isCompleted && !isTaskRecurring(task)),
+      ),
+    [tags, tasks],
+  );
+
+  const renderTagGroups = (
+    groups: TasksByTagGroup[],
+    options?: {
+      variant?: 'default' | 'completed';
+      collapseScope?: 'open' | 'completed';
+    },
+  ) => {
+    const variant = options?.variant ?? 'default';
+    const collapseScope = options?.collapseScope ?? 'open';
+
+    return groups.map((group) => {
+      const collapseKey = `${collapseScope}:${group.groupKey}`;
+      const isCollapsed = collapsedTaskTagGroups[collapseKey] ?? false;
+
+      return (
+        <View
+          key={`${collapseScope}:${group.groupKey}`}
+          style={[
+            styles.tagGroupBlock,
+            variant === 'completed' ? styles.tagGroupBlockCompleted : null,
+          ]}
+        >
+          <Pressable
+            style={[
+              styles.tagGroupToggle,
+              variant === 'completed' ? styles.tagGroupToggleCompleted : null,
+            ]}
+            onPress={() => toggleTaskTagGroupCollapsed(collapseKey)}
+          >
+            <View style={styles.tagGroupToggleCopy}>
+              <View style={styles.tagGroupTitleRow}>
+                <Text style={styles.tagGroupTitle}>{group.groupLabel}</Text>
+                <Text style={styles.tagGroupMeta}>
+                  {group.entries.length} {group.entries.length === 1 ? 'Tag' : 'Tags'} -{' '}
+                  {group.taskCount} Einträge
+                </Text>
+              </View>
+              <View style={styles.tagGroupTagPreview}>
+                {group.entries.map(({ tag }) => (
+                  <View
+                    key={`${collapseScope}:${group.groupKey}:preview:${tag.id}`}
+                    style={styles.tagGroupTagChip}
+                  >
+                    <View style={[styles.tagGroupTagDot, { backgroundColor: tag.color }]} />
+                    <Text style={styles.tagGroupTagLabel}>{tag.name}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.tagGroupAction,
+                variant === 'completed' ? styles.tagGroupActionCompleted : null,
+              ]}
+            >
+              {isCollapsed ? 'Zeigen' : 'Verbergen'}
+            </Text>
+          </Pressable>
+
+          {!isCollapsed ? (
+            <View style={styles.tagGroupSections}>
+              {group.entries.map(({ tag, tasks: groupedTasks }) => (
+                <TaskGroupSection
+                  key={`${collapseScope}:${group.groupKey}:${tag.id}`}
+                  title={tag.name}
+                  subtitle={`${groupedTasks.length} ${
+                    variant === 'completed' ? 'erledigt' : 'offen'
+                  }`}
+                  tasks={groupedTasks}
+                  tagsById={tagsById}
+                  accentColor={tag.color}
+                  onToggleTask={(task, nextValue) =>
+                    void toggleTaskCompletion(task.id, nextValue)
+                  }
+                  onPressTask={(task) => router.push(`/task/${task.id}`)}
+                  variant={variant}
+                  getTaskRowProps={(task) => ({
+                    displayDate:
+                      isTaskRecurring(task) && task.date ? `Start ${task.date}` : undefined,
+                    disableToggle: isTaskRecurring(task),
+                  })}
+                />
+              ))}
+            </View>
+          ) : null}
+        </View>
+      );
+    });
+  };
 
   return (
     <Screen
@@ -49,18 +210,9 @@ export default function TasksScreen() {
         />
       ) : null}
 
-      {openGroups.map(({ tag, tasks: groupedTasks }) => (
-        <TaskGroupSection
-          key={`${tag.id}-open`}
-          title={`${tag.name} - Offen`}
-          tasks={groupedTasks}
-          tagsById={tagsById}
-          onToggleTask={(task, nextValue) => void toggleTaskCompletion(task.id, nextValue)}
-          onPressTask={(task) => router.push(`/task/${task.id}`)}
-        />
-      ))}
+      {renderTagGroups(openTagGroups, { collapseScope: 'open' })}
 
-      {completedGroups.length > 0 ? (
+      {completedTagGroups.length > 0 ? (
         <View style={styles.completedSection}>
           <View style={styles.completedSectionHeader}>
             <Text style={styles.completedEyebrow}>Erledigte Aufgaben</Text>
@@ -71,17 +223,10 @@ export default function TasksScreen() {
           </View>
 
           <View style={styles.completedSectionList}>
-            {completedGroups.map(({ tag, tasks: groupedTasks }) => (
-              <TaskGroupSection
-                key={`${tag.id}-completed`}
-                title={`${tag.name} - Erledigt`}
-                tasks={groupedTasks}
-                tagsById={tagsById}
-                onToggleTask={(task, nextValue) => void toggleTaskCompletion(task.id, nextValue)}
-                onPressTask={(task) => router.push(`/task/${task.id}`)}
-                variant="completed"
-              />
-            ))}
+            {renderTagGroups(completedTagGroups, {
+              variant: 'completed',
+              collapseScope: 'completed',
+            })}
           </View>
         </View>
       ) : null}
@@ -90,6 +235,93 @@ export default function TasksScreen() {
 }
 
 const styles = StyleSheet.create({
+  tagGroupBlock: {
+    gap: spacing.sm,
+  },
+  tagGroupBlockCompleted: {
+    gap: spacing.sm,
+  },
+  tagGroupToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+  },
+  tagGroupToggleCompleted: {
+    backgroundColor: 'rgba(21, 27, 35, 0.86)',
+    borderColor: 'rgba(151, 163, 182, 0.28)',
+  },
+  tagGroupToggleCopy: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  tagGroupTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  tagGroupTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  tagGroupMeta: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagGroupTagPreview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  tagGroupTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+  },
+  tagGroupTagDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radii.pill,
+  },
+  tagGroupTagLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tagGroupAction: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceElevated,
+  },
+  tagGroupActionCompleted: {
+    color: colors.success,
+  },
+  tagGroupSections: {
+    gap: spacing.sm,
+    marginLeft: spacing.sm,
+    paddingLeft: spacing.md,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.border,
+  },
   completedSection: {
     marginTop: spacing['2xl'],
     padding: spacing.lg,

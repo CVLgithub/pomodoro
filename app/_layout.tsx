@@ -10,7 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { colors } from '../src/constants/colors';
 import { initializeDatabase } from '../src/db/client';
 import { useAppResume } from '../src/hooks/useAppResume';
-import { downsyncEntries } from '../src/services/sync/downsyncService';
+import { downsyncEntries, downsyncOpenTasks } from '../src/services/sync/downsyncService';
 import { getEntriesRequestUrl } from '../src/services/api/entriesService';
 import { useSessionsStore } from '../src/store/sessionsStore';
 import { useSettingsStore } from '../src/store/settingsStore';
@@ -19,6 +19,15 @@ import { useTagsStore } from '../src/store/tagsStore';
 import { useTasksStore } from '../src/store/tasksStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { useUiStore } from '../src/store/uiStore';
+
+const runAutomaticDownsync = async (): Promise<void> => {
+  if (Platform.OS === 'web') {
+    await downsyncEntries();
+    return;
+  }
+
+  await downsyncOpenTasks();
+};
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(Ionicons.font);
@@ -33,17 +42,16 @@ export default function RootLayout() {
       try {
         await initializeDatabase();
         await useSettingsStore.getState().loadSettings();
-        if (Platform.OS === 'web') {
-          try {
-            await downsyncEntries();
-          } catch (error) {
-            console.warn(
-              'Web downsync failed during bootstrap',
-              getEntriesRequestUrl(),
-              error instanceof Error ? error.message : error,
-            );
-          }
+        try {
+          await runAutomaticDownsync();
+        } catch (error) {
+          console.warn(
+            'Automatic downsync failed during bootstrap',
+            getEntriesRequestUrl(),
+            error instanceof Error ? error.message : error,
+          );
         }
+        await useSettingsStore.getState().loadSettings();
         await Promise.all([
           useTagsStore.getState().loadTags(),
           useTasksStore.getState().loadTasks(),
@@ -79,20 +87,19 @@ export default function RootLayout() {
         : null);
 
   useAppResume(async () => {
-    if (Platform.OS === 'web') {
-      try {
-        await downsyncEntries();
-      } catch (error) {
-        console.warn(
-          'Web downsync failed on resume',
-          getEntriesRequestUrl(),
-          error instanceof Error ? error.message : error,
-        );
-      }
+    try {
+      await runAutomaticDownsync();
+    } catch (error) {
+      console.warn(
+        'Automatic downsync failed on resume',
+        getEntriesRequestUrl(),
+        error instanceof Error ? error.message : error,
+      );
     }
 
     await useTimerStore.getState().reconcileWithClock();
     await Promise.all([
+      useSettingsStore.getState().loadSettings(),
       useSessionsStore.getState().loadSessions(),
       useSyncStore.getState().loadQueue(),
       useTasksStore.getState().loadTasks(),

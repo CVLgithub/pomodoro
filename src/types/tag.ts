@@ -2,6 +2,7 @@ export interface Tag {
   id: string;
   name: string;
   color: string;
+  groupName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -9,11 +10,13 @@ export interface Tag {
 export interface CreateTagInput {
   name: string;
   color: string;
+  groupName?: string | null;
 }
 
 export interface UpdateTagInput {
   name?: string;
   color?: string;
+  groupName?: string | null;
 }
 
 export interface TagDeletePayload {
@@ -21,4 +24,3 @@ export interface TagDeletePayload {
   deletedAt: string;
   isDeleted: true;
 }
-

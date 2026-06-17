@@ -7,20 +7,25 @@ import {
   getNotificationPreferences,
   getBackendUrlSetting,
   getAutoSwitchToBreaksSetting,
+  getTagGroupsSetting,
   saveNotificationPreferences,
   saveBackendUrlSetting,
   saveAutoSwitchToBreaksSetting,
+  saveTagGroupsSetting,
 } from '../db/repositories/settingsRepository';
+import { normalizeCustomTagGroupName } from '../utils/tagGroups';
 
 interface SettingsStoreState {
   backendUrl: string;
   notificationPreferences: NotificationPreferences;
   autoSwitchToBreaks: boolean;
+  tagGroups: string[];
   isHydrated: boolean;
   loadSettings: () => Promise<void>;
   saveBackendUrl: (value: string) => Promise<void>;
   saveNotificationPreferences: (value: NotificationPreferences) => Promise<void>;
   saveAutoSwitchToBreaks: (value: boolean) => Promise<void>;
+  createTagGroup: (value: string) => Promise<string>;
 }
 
 const normalizeBackendUrl = (value: string): string => value.trim().replace(/\/+$/, '');
@@ -29,35 +34,37 @@ const assertValidBackendUrl = (value: string): string => {
   const normalizedValue = normalizeBackendUrl(value);
 
   if (!normalizedValue) {
-    throw new Error('Backend-URL darf nicht leer sein');
+    throw new Error('Adresse darf nicht leer sein');
   }
 
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(normalizedValue);
   } catch {
-    throw new Error('Backend-URL muss eine vollständige http(s)-URL sein');
+    throw new Error('Adresse muss eine vollständige http(s)-URL sein');
   }
 
   if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-    throw new Error('Backend-URL muss mit http:// oder https:// beginnen');
+    throw new Error('Adresse muss mit http:// oder https:// beginnen');
   }
 
   return normalizedValue;
 };
 
-export const useSettingsStore = create<SettingsStoreState>((set) => ({
+export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   backendUrl: normalizeBackendUrl(DEFAULT_BACKEND_URL),
   notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
   autoSwitchToBreaks: DEFAULT_AUTO_SWITCH_TO_BREAKS,
+  tagGroups: [],
   isHydrated: false,
   loadSettings: async () => {
     const backendUrl = normalizeBackendUrl(await getBackendUrlSetting());
-    const [notificationPreferences, autoSwitchToBreaks] = await Promise.all([
+    const [notificationPreferences, autoSwitchToBreaks, tagGroups] = await Promise.all([
       getNotificationPreferences(),
       getAutoSwitchToBreaksSetting(),
+      getTagGroupsSetting(),
     ]);
-    set({ backendUrl, notificationPreferences, autoSwitchToBreaks, isHydrated: true });
+    set({ backendUrl, notificationPreferences, autoSwitchToBreaks, tagGroups, isHydrated: true });
   },
   saveBackendUrl: async (value) => {
     const backendUrl = assertValidBackendUrl(value);
@@ -71,5 +78,27 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
   saveAutoSwitchToBreaks: async (value) => {
     const autoSwitchToBreaks = await saveAutoSwitchToBreaksSetting(value);
     set({ autoSwitchToBreaks, isHydrated: true });
+  },
+  createTagGroup: async (value) => {
+    const groupName = normalizeCustomTagGroupName(value);
+
+    if (!groupName) {
+      throw new Error('Gruppenname ist erforderlich');
+    }
+
+    const existingGroups = get().tagGroups;
+    const alreadyExists = existingGroups.some(
+      (existingGroup) =>
+        existingGroup.localeCompare(groupName, 'de-DE', { sensitivity: 'base' }) === 0,
+    );
+
+    if (alreadyExists) {
+      throw new Error('Diese Gruppe existiert bereits');
+    }
+
+    const tagGroups = await saveTagGroupsSetting([...existingGroups, groupName]);
+    set({ tagGroups, isHydrated: true });
+
+    return groupName;
   },
 }));

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { GENERAL_TAG_ID } from '../constants/config';
+import { listTaskOccurrenceCompletions, setTaskOccurrenceCompletion } from '../db/repositories/taskOccurrenceCompletionsRepository';
 import {
   createTask as createTaskRecord,
   deleteTask as deleteTaskRecord,
@@ -17,19 +18,30 @@ import {
   toSessionPushPayload,
   toTaskPushPayload,
 } from '../services/sync/payloads';
-import { CreateTaskInput, Task, UpdateTaskInput } from '../types/task';
+import {
+  CreateTaskInput,
+  Task,
+  TaskOccurrenceCompletion,
+  UpdateTaskInput,
+} from '../types/task';
+import { isTaskRecurring } from '../utils/taskRecurrence';
 import { useSessionsStore } from './sessionsStore';
 import { useSyncStore } from './syncStore';
 import { useTimerStore } from './timerStore';
 
 interface TasksStoreState {
   tasks: Task[];
+  occurrenceCompletions: TaskOccurrenceCompletion[];
   isLoading: boolean;
   loadTasks: () => Promise<void>;
   createTask: (input: CreateTaskInput) => Promise<Task>;
   updateTask: (id: string, input: UpdateTaskInput) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
-  toggleTaskCompletion: (id: string, isCompleted: boolean) => Promise<void>;
+  toggleTaskCompletion: (
+    id: string,
+    isCompleted: boolean,
+    options?: { date?: string },
+  ) => Promise<void>;
 }
 
 const swallowSyncError = async (work: Promise<void>): Promise<void> => {
@@ -42,13 +54,17 @@ const swallowSyncError = async (work: Promise<void>): Promise<void> => {
 
 export const useTasksStore = create<TasksStoreState>((set, get) => ({
   tasks: [],
+  occurrenceCompletions: [],
   isLoading: false,
   loadTasks: async () => {
     set({ isLoading: true });
 
     try {
-      const tasks = await listTasks();
-      set({ tasks });
+      const [tasks, occurrenceCompletions] = await Promise.all([
+        listTasks(),
+        listTaskOccurrenceCompletions(),
+      ]);
+      set({ tasks, occurrenceCompletions });
     } finally {
       set({ isLoading: false });
     }
@@ -101,7 +117,24 @@ export const useTasksStore = create<TasksStoreState>((set, get) => ({
     await swallowSyncError(syncManager.pushTask(id, createTaskDeletePayload(id)));
     await useSyncStore.getState().loadQueue();
   },
-  toggleTaskCompletion: async (id, isCompleted) => {
+  toggleTaskCompletion: async (id, isCompleted, options) => {
+    const task = get().tasks.find((entry) => entry.id === id);
+
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    if (isTaskRecurring(task)) {
+      if (!options?.date) {
+        throw new Error('Recurring tasks need a specific date for completion changes.');
+      }
+
+      await setTaskOccurrenceCompletion(id, options.date, isCompleted);
+      const occurrenceCompletions = await listTaskOccurrenceCompletions();
+      set({ occurrenceCompletions });
+      return;
+    }
+
     await get().updateTask(id, { isCompleted });
   },
 }));

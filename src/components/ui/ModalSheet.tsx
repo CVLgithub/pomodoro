@@ -1,21 +1,43 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
   Modal,
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   View,
+  ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
+import {
+  GestureHandlerRootView,
+  PanGestureHandler,
+  PanGestureHandlerStateChangeEvent,
+  State,
+} from 'react-native-gesture-handler';
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
+
+type ModalSheetSwipeAreaProps = {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+};
+
+type ModalSheetRenderProps = {
+  SwipeArea: ({ children, style }: ModalSheetSwipeAreaProps) => ReactNode;
+};
+
+type ModalSheetChildren = ReactNode | ((props: ModalSheetRenderProps) => ReactNode);
 
 interface ModalSheetProps {
   visible: boolean;
   title: string;
   onClose: () => void;
-  children: ReactNode;
+  children: ModalSheetChildren;
+  swipeToClose?: boolean;
 }
 
 export const ModalSheet = ({
@@ -23,10 +45,99 @@ export const ModalSheet = ({
   title,
   onClose,
   children,
+  swipeToClose = false,
 }: ModalSheetProps) => {
   const [isMounted, setIsMounted] = useState(visible);
+  const { height: windowHeight } = useWindowDimensions();
+  const hiddenTranslateY = Math.max(windowHeight, 720);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const sheetTranslateY = useRef(new Animated.Value(28)).current;
+  const sheetTranslateY = useRef(new Animated.Value(hiddenTranslateY)).current;
+  const onCloseRef = useRef(onClose);
+
+  onCloseRef.current = onClose;
+
+  const sheetDisplayTranslateY = useMemo(
+    () =>
+      sheetTranslateY.interpolate({
+        inputRange: [0, hiddenTranslateY],
+        outputRange: [0, hiddenTranslateY],
+        extrapolate: 'clamp',
+      }),
+    [hiddenTranslateY, sheetTranslateY],
+  );
+
+  const resetSheetPosition = useCallback((velocityY = 0) => {
+    Animated.spring(sheetTranslateY, {
+      toValue: 0,
+      useNativeDriver: true,
+      damping: 28,
+      stiffness: 320,
+      mass: 0.9,
+      velocity: velocityY,
+      overshootClamping: true,
+    }).start();
+  }, [sheetTranslateY]);
+
+  const handleSwipeGesture = useMemo(
+    () =>
+      Animated.event(
+        [
+          {
+            nativeEvent: {
+              translationY: sheetTranslateY,
+            },
+          },
+        ],
+        { useNativeDriver: true },
+      ),
+    [sheetTranslateY],
+  );
+
+  const handleSwipeStateChange = useCallback(
+    (event: PanGestureHandlerStateChangeEvent) => {
+      const { state, translationY, velocityY } = event.nativeEvent;
+
+      if (state === State.BEGAN) {
+        sheetTranslateY.stopAnimation();
+        return;
+      }
+
+      if (state !== State.END && state !== State.CANCELLED && state !== State.FAILED) {
+        return;
+      }
+
+      if (translationY > 76 || velocityY > 900) {
+        onCloseRef.current();
+        return;
+      }
+
+      resetSheetPosition(velocityY);
+    },
+    [resetSheetPosition, sheetTranslateY],
+  );
+
+  const SwipeArea = useMemo(
+    () =>
+      ({ children: areaChildren, style }: ModalSheetSwipeAreaProps) => {
+        if (!swipeToClose) {
+          return <View style={style}>{areaChildren}</View>;
+        }
+
+        return (
+          <PanGestureHandler
+            activeOffsetY={8}
+            failOffsetX={[-24, 24]}
+            onGestureEvent={handleSwipeGesture}
+            onHandlerStateChange={handleSwipeStateChange}
+          >
+            <Animated.View style={style}>{areaChildren}</Animated.View>
+          </PanGestureHandler>
+        );
+      },
+    [handleSwipeGesture, handleSwipeStateChange, swipeToClose],
+  );
+  const renderedChildren =
+    typeof children === 'function' ? children({ SwipeArea }) : children;
 
   useEffect(() => {
     if (visible) {
@@ -41,6 +152,7 @@ export const ModalSheet = ({
         Animated.timing(sheetTranslateY, {
           toValue: 0,
           duration: 220,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
       ]).start();
@@ -55,8 +167,9 @@ export const ModalSheet = ({
         useNativeDriver: true,
       }),
       Animated.timing(sheetTranslateY, {
-        toValue: 28,
-        duration: 160,
+        toValue: hiddenTranslateY,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
@@ -64,34 +177,44 @@ export const ModalSheet = ({
         setIsMounted(false);
       }
     });
-  }, [overlayOpacity, sheetTranslateY, visible]);
+  }, [hiddenTranslateY, overlayOpacity, sheetTranslateY, visible]);
 
   return (
     <Modal transparent animationType="none" visible={isMounted} onRequestClose={onClose}>
-      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              transform: [{ translateY: sheetTranslateY }],
-            },
-          ]}
-        >
-          <View style={styles.header}>
-            <Text style={styles.title}>{title}</Text>
-            <Pressable onPress={onClose}>
-              <Text style={styles.close}>Fertig</Text>
-            </Pressable>
-          </View>
-          {children}
+      <GestureHandlerRootView style={styles.modalRoot}>
+        <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                transform: [{ translateY: sheetDisplayTranslateY }],
+              },
+            ]}
+          >
+            {swipeToClose ? (
+              <SwipeArea style={styles.dragHandleArea}>
+                <View style={styles.dragHandle} />
+              </SwipeArea>
+            ) : null}
+            <SwipeArea style={styles.header}>
+              <Text style={styles.title}>{title}</Text>
+              <Pressable onPress={onClose}>
+                <Text style={styles.close}>Fertig</Text>
+              </Pressable>
+            </SwipeArea>
+            {renderedChildren}
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  modalRoot: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -105,6 +228,16 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing['3xl'],
     gap: spacing.lg,
+  },
+  dragHandleArea: {
+    alignItems: 'center',
+    paddingBottom: spacing.xs,
+  },
+  dragHandle: {
+    width: 44,
+    height: 5,
+    borderRadius: radii.pill,
+    backgroundColor: colors.border,
   },
   header: {
     flexDirection: 'row',

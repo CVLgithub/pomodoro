@@ -15,6 +15,6 @@ export const postJson = async <TPayload>(
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(body || `Request failed with status ${response.status}`);
+    throw new Error(body || `Senden fehlgeschlagen (${response.status}).`);
   }
 };

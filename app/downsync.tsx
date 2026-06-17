@@ -16,6 +16,7 @@ import { SectionHeader } from '../src/components/ui/SectionHeader';
 import { colors } from '../src/constants/colors';
 import { radii, spacing } from '../src/constants/spacing';
 import { useSessionsStore } from '../src/store/sessionsStore';
+import { useSettingsStore } from '../src/store/settingsStore';
 import { useSyncStore } from '../src/store/syncStore';
 import { useTagsStore } from '../src/store/tagsStore';
 import { useTasksStore } from '../src/store/tasksStore';
@@ -29,22 +30,28 @@ const ENTRY_GROUPS: Array<{
   {
     entityType: 'session',
     title: 'Sessions',
-    subtitle: 'Bereits gespeicherte Sessions, die noch nicht lokal angekommen sind.',
+    subtitle: 'Neue oder geänderte Sessions.',
+  },
+  {
+    entityType: 'tagGroups',
+    title: 'Gruppen',
+    subtitle: 'Leere oder neu gespeicherte Tag-Gruppen.',
   },
   {
     entityType: 'tag',
     title: 'Tags',
-    subtitle: 'Server-Tags, die lokal fehlen oder von deiner lokalen Version abweichen.',
+    subtitle: 'Neue oder geänderte Tags.',
   },
   {
     entityType: 'task',
     title: 'Aufgaben',
-    subtitle: 'Aufgaben vom Server, die du gezielt lokal übernehmen kannst.',
+    subtitle: 'Neue oder geänderte Aufgaben.',
   },
 ];
 
 const ENTITY_LABELS: Record<DownsyncEntityType, string> = {
   tag: 'Tag',
+  tagGroups: 'Gruppe',
   task: 'Aufgabe',
   session: 'Session',
 };
@@ -54,6 +61,7 @@ export default function DownsyncScreen() {
   const loadTags = useTagsStore((state) => state.loadTags);
   const loadTasks = useTasksStore((state) => state.loadTasks);
   const loadSessions = useSessionsStore((state) => state.loadSessions);
+  const loadSettings = useSettingsStore((state) => state.loadSettings);
   const loadQueue = useSyncStore((state) => state.loadQueue);
   const hydrateTimer = useTimerStore((state) => state.hydrate);
 
@@ -76,6 +84,7 @@ export default function DownsyncScreen() {
       loadTags(),
       loadTasks(),
       loadSessions(),
+      loadSettings(),
       loadQueue(),
       hydrateTimer(),
     ]);
@@ -107,12 +116,12 @@ export default function DownsyncScreen() {
       await refreshAppState();
       await loadPendingEntries();
       Alert.alert(
-        'Lokal übernommen',
-        `${ENTITY_LABELS[entry.entityType]} „${entry.title}“ wurde lokal übernommen.`,
+        'Übernommen',
+        `${ENTITY_LABELS[entry.entityType]} „${entry.title}“ wurde übernommen.`,
       );
     } catch (error) {
       Alert.alert(
-        'Downsync fehlgeschlagen',
+        'Import fehlgeschlagen',
         error instanceof Error ? error.message : 'Unbekannter Fehler',
       );
     } finally {
@@ -124,7 +133,7 @@ export default function DownsyncScreen() {
     const confirmationLines = [entry.detail, entry.dependencyHint].filter(Boolean);
 
     Alert.alert(
-      'Lokal übernehmen?',
+      'Eintrag übernehmen?',
       confirmationLines.join('\n'),
       [
         { text: 'Abbrechen', style: 'cancel' },
@@ -140,14 +149,14 @@ export default function DownsyncScreen() {
 
   return (
     <Screen
-      title="Downsync"
-      subtitle="Server-Einträge manuell prüfen und einzeln lokal übernehmen."
+      title="Import"
+      subtitle="Prüfe neue oder geänderte Einträge und übernimm sie einzeln."
       headerRight={<Button label="Zurück" variant="ghost" onPress={() => router.back()} />}
     >
       <SectionCard>
         <SectionHeader
           title="Manueller Import"
-          subtitle="Automatischer Downsync bleibt auf dem iPhone aus. Hier siehst du nur Einträge, die lokal fehlen oder von deiner lokalen Version abweichen."
+          subtitle="Hier kannst du neue oder geänderte Einträge prüfen."
           action={
             <Button
               label="Neu laden"
@@ -158,7 +167,7 @@ export default function DownsyncScreen() {
           }
         />
         <Text style={styles.infoText}>
-          Verknüpfte Tags oder Aufgaben werden bei Bedarf zusammen mit dem bestätigten Eintrag übernommen.
+          Verknüpfte Tags oder Aufgaben werden bei Bedarf mit übernommen.
         </Text>
       </SectionCard>
 
@@ -166,7 +175,7 @@ export default function DownsyncScreen() {
         <SectionCard>
           <View style={styles.loadingState}>
             <ActivityIndicator color={colors.accent} />
-            <Text style={styles.loadingText}>Server-Einträge werden geladen...</Text>
+            <Text style={styles.loadingText}>Einträge werden geladen...</Text>
           </View>
         </SectionCard>
       ) : null}
@@ -175,7 +184,7 @@ export default function DownsyncScreen() {
         <SectionCard>
           <SectionHeader
             title="Laden fehlgeschlagen"
-            subtitle="Die Server-Einträge konnten nicht gelesen werden."
+            subtitle="Die Einträge konnten nicht gelesen werden."
           />
           <Text style={styles.errorText}>{errorMessage}</Text>
           <Button
@@ -189,8 +198,8 @@ export default function DownsyncScreen() {
 
       {!isLoading && !errorMessage && entries.length === 0 ? (
         <EmptyState
-          title="Keine offenen Downsync-Einträge"
-          description="Sobald auf dem Server neue oder abweichende Einträge vorhanden sind, kannst du sie hier einzeln lokal übernehmen."
+          title="Keine offenen Einträge"
+          description="Sobald neue oder geänderte Einträge vorhanden sind, kannst du sie hier übernehmen."
         />
       ) : null}
 
@@ -227,7 +236,7 @@ export default function DownsyncScreen() {
                       </View>
                       <View style={styles.entryAction}>
                         <Button
-                          label={activeEntryId === entry.id ? 'Übernehme...' : 'Übernehmen'}
+                          label={activeEntryId === entry.id ? 'Wird übernommen...' : 'Übernehmen'}
                           variant="secondary"
                           onPress={() => confirmApplyEntry(entry)}
                           disabled={activeEntryId !== null}

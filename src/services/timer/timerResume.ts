@@ -2,13 +2,13 @@ import { FREE_SESSION_TITLE } from '../../constants/config';
 import { CreateSessionInput } from '../../types/session';
 import { Task } from '../../types/task';
 import { TimerStateRecord } from '../../types/timer';
-import { differenceInMinutes, formatDateKey } from '../../utils/date';
+import { formatDateKey } from '../../utils/date';
 import { timerEngine } from './timerEngine';
 
 export const getTrackedFocusMinutes = (
   state: TimerStateRecord,
-  now = new Date(),
-): number => Math.floor(timerEngine.getElapsedSeconds(state, now) / 60);
+  now: string | Date = new Date(),
+): number => Math.max(0, Math.round(timerEngine.getElapsedSeconds(state, now) / 60));
 
 export const isTimerExpired = (
   state: TimerStateRecord,
@@ -27,7 +27,7 @@ const buildFocusSession = (
   endedAt: string,
 ): CreateSessionInput | null => {
   const startTime = state.sessionStartedAt ?? state.startedAt ?? endedAt;
-  const durationMinutes = differenceInMinutes(endedAt, startTime);
+  const durationMinutes = getTrackedFocusMinutes(state, endedAt);
 
   if (durationMinutes <= 0) {
     return null;
