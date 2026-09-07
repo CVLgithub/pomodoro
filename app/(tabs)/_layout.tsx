@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 
+
 import { Ionicon } from '../../src/components/ui/Ionicon';
 import { colors } from '../../src/constants/colors';
 
