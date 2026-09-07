@@ -3,8 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "noEmit": true,
-    "moduleResolution": "bundler",
-    "types": ["expo-router/types"]
+    "moduleResolution": "bundler"
   },
   "include": [
     "**/*.ts",

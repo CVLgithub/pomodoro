@@ -23,7 +23,7 @@ export default function TabsLayout() {
           borderTopColor: colors.border,
         },
         tabBarIcon: ({ color, size }) => (
-          <Ionicon name={icons[route.name]} color={color} size={size} />
+          <Ionicon name={icons[route.name]} color={String(color)} size={size} />
         ),
       })}
     >
