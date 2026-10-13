@@ -3,6 +3,9 @@ import { create } from 'zustand';
 import { DEFAULT_AUTO_SWITCH_TO_BREAKS, DEFAULT_BACKEND_URL } from '../constants/config';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../constants/notifications';
 import { NotificationPreferences } from '../types/notifications';
+import { syncManager } from '../services/sync/syncManager';
+import { toTagGroupsPushPayload } from '../services/sync/payloads';
+import { useSyncStore } from './syncStore';
 import {
   getNotificationPreferences,
   getBackendUrlSetting,
@@ -26,6 +29,7 @@ interface SettingsStoreState {
   saveNotificationPreferences: (value: NotificationPreferences) => Promise<void>;
   saveAutoSwitchToBreaks: (value: boolean) => Promise<void>;
   createTagGroup: (value: string) => Promise<string>;
+  deleteTagGroup: (value: string) => Promise<void>;
 }
 
 const normalizeBackendUrl = (value: string): string => value.trim().replace(/\/+$/, '');
@@ -100,5 +104,30 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     set({ tagGroups, isHydrated: true });
 
     return groupName;
+  },
+  deleteTagGroup: async (value) => {
+    const groupName = normalizeCustomTagGroupName(value);
+
+    if (!groupName) {
+      throw new Error('Ungültige Tag-Gruppe');
+    }
+
+    const existingGroups = get().tagGroups;
+    const tagGroups = await saveTagGroupsSetting(
+      existingGroups.filter(
+        (existingGroup) =>
+          existingGroup.localeCompare(groupName, 'de-DE', { sensitivity: 'base' }) !== 0,
+      ),
+    );
+
+    set({ tagGroups, isHydrated: true });
+
+    try {
+      await syncManager.pushTagGroups(toTagGroupsPushPayload(tagGroups));
+    } catch {
+      // Sync failures are captured by the queue.
+    } finally {
+      await useSyncStore.getState().loadQueue();
+    }
   },
 }));

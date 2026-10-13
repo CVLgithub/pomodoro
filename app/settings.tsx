@@ -26,6 +26,7 @@ import type { Tag } from '../src/types/tag';
 import { addMinutes, formatDateKey, formatTimeLabel, toLocalIsoString } from '../src/utils/date';
 import {
   buildTagGroupOptions,
+  DEFAULT_TAG_GROUP_KEY,
   getTagGroupKey,
   sortTagsByGroupAndName,
 } from '../src/utils/tagGroups';
@@ -224,10 +225,12 @@ export default function SettingsScreen() {
   const notificationPreferences = useSettingsStore((state) => state.notificationPreferences);
   const autoSwitchToBreaks = useSettingsStore((state) => state.autoSwitchToBreaks);
   const tagGroups = useSettingsStore((state) => state.tagGroups);
+  const deleteTagGroup = useSettingsStore((state) => state.deleteTagGroup);
   const saveBackendUrl = useSettingsStore((state) => state.saveBackendUrl);
   const saveNotificationPreferences = useSettingsStore((state) => state.saveNotificationPreferences);
   const saveAutoSwitchToBreaks = useSettingsStore((state) => state.saveAutoSwitchToBreaks);
   const createSessionEntry = useSessionsStore((state) => state.createSessionEntry);
+  const updateTag = useTagsStore((state) => state.updateTag);
 
   const [backendUrlInput, setBackendUrlInput] = useState(backendUrl);
   const [isSavingBackendUrl, setIsSavingBackendUrl] = useState(false);
@@ -235,6 +238,7 @@ export default function SettingsScreen() {
   const [manualSessionDraft, setManualSessionDraft] = useState(getManualSessionDefaults);
   const [isSavingManualSession, setIsSavingManualSession] = useState(false);
   const [showCollapsedQueueItems, setShowCollapsedQueueItems] = useState(false);
+  const [isEditingTagGroups, setIsEditingTagGroups] = useState(false);
 
   useEffect(() => {
     setBackendUrlInput(backendUrl);
@@ -296,6 +300,39 @@ export default function SettingsScreen() {
     } catch (error) {
       Alert.alert(title, error instanceof Error ? error.message : 'Unbekannter Fehler');
     }
+  };
+
+  const handleDeleteTagGroup = (group: SettingsTagGroup) => {
+    const tagCount = group.tags.length;
+    const message =
+      tagCount === 1
+        ? 'Der zugehörige Tag wird nach Allgemein verschoben.'
+        : tagCount > 1
+          ? `${tagCount} zugehörige Tags werden nach Allgemein verschoben.`
+          : 'Diese Gruppe wird dauerhaft entfernt.';
+
+    Alert.alert('Tag-Gruppe löschen?', message, [
+      { text: 'Abbrechen', style: 'cancel' },
+      {
+        text: 'Löschen',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              for (const tag of group.tags) {
+                await updateTag(tag.id, { groupName: null });
+              }
+              await deleteTagGroup(group.groupLabel);
+            } catch (error) {
+              Alert.alert(
+                'Tag-Gruppe konnte nicht gelöscht werden',
+                error instanceof Error ? error.message : 'Unbekannter Fehler',
+              );
+            }
+          })();
+        },
+      },
+    ]);
   };
 
   const handleSaveBackendUrl = async () => {
@@ -496,9 +533,20 @@ export default function SettingsScreen() {
             <View key={group.groupKey} style={styles.tagListGroup}>
               <View style={styles.tagListGroupHeader}>
                 <Text style={styles.tagListGroupTitle}>{group.groupLabel}</Text>
-                <Text style={styles.tagListGroupCount}>
-                  {group.tags.length} {group.tags.length === 1 ? 'Tag' : 'Tags'}
-                </Text>
+                <View style={styles.tagListGroupActions}>
+                  <Text style={styles.tagListGroupCount}>
+                    {group.tags.length} {group.tags.length === 1 ? 'Tag' : 'Tags'}
+                  </Text>
+                  {isEditingTagGroups && group.groupKey !== DEFAULT_TAG_GROUP_KEY ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => handleDeleteTagGroup(group)}
+                      style={styles.tagGroupDeleteButton}
+                    >
+                      <Text style={styles.tagGroupDeleteLabel}>Gruppe löschen</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
               <View style={styles.tagListGroupRows}>
                 {group.tags.length > 0 ? (
@@ -518,6 +566,17 @@ export default function SettingsScreen() {
             </View>
           ))}
         </View>
+        {tagGroups.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setIsEditingTagGroups((isEditing) => !isEditing)}
+            style={styles.tagGroupsEditButton}
+          >
+            <Text style={styles.tagGroupsEditLabel}>
+              {isEditingTagGroups ? 'Fertig' : 'Bearbeiten'}
+            </Text>
+          </Pressable>
+        ) : null}
       </SectionCard>
 
       <SectionCard>
@@ -837,6 +896,35 @@ const styles = StyleSheet.create({
   tagListGroupCount: {
     color: colors.textMuted,
     fontSize: 12,
+    fontWeight: '600',
+  },
+  tagListGroupActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  tagGroupDeleteButton: {
+    minHeight: 30,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.3)',
+    borderRadius: radii.sm,
+  },
+  tagGroupDeleteLabel: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagGroupsEditButton: {
+    alignSelf: 'flex-end',
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  tagGroupsEditLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
     fontWeight: '600',
   },
   tagListGroupRows: {
