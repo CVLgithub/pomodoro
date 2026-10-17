@@ -2,10 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 
 type SupportedIoniconName =
   | 'sunny-outline'
+  | 'sunny'
   | 'timer-outline'
+  | 'timer'
   | 'calendar-outline'
+  | 'calendar'
   | 'list-outline'
+  | 'list'
   | 'bar-chart-outline'
+  | 'bar-chart'
+  | 'settings-outline'
+  | 'play'
+  | 'pause'
+  | 'stop'
+  | 'refresh'
   | 'repeat'
   | 'checkmark';
 

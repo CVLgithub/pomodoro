@@ -11,7 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { colors } from '../../constants/colors';
-import { radii, spacing } from '../../constants/spacing';
+import { fonts } from '../../constants/fonts';
+import { spacing } from '../../constants/spacing';
 
 interface ScreenProps {
   title: string;
@@ -46,8 +47,6 @@ export const Screen = ({
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar style="light" />
-      <View style={styles.backgroundOrbPrimary} />
-      <View style={styles.backgroundOrbSecondary} />
       {scroll ? (
         <ScrollView
           style={styles.container}
@@ -74,13 +73,14 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing['3xl'],
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingTop: spacing.md,
+    alignItems: 'center',
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
     gap: spacing.md,
   },
   headerText: {
@@ -89,32 +89,16 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 31,
+    fontFamily: fonts.display,
+    fontSize: 30,
     lineHeight: 36,
     fontWeight: '700',
+    letterSpacing: -0.4,
   },
   subtitle: {
-    color: colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  backgroundOrbPrimary: {
-    position: 'absolute',
-    top: -80,
-    right: -40,
-    width: 240,
-    height: 240,
-    borderRadius: radii.pill,
-    backgroundColor: 'rgba(94, 162, 255, 0.08)',
-  },
-  backgroundOrbSecondary: {
-    position: 'absolute',
-    bottom: 80,
-    left: -60,
-    width: 220,
-    height: 220,
-    borderRadius: radii.pill,
-    backgroundColor: 'rgba(70, 195, 123, 0.05)',
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
 

@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
+import { fonts } from '../../constants/fonts';
 import { spacing } from '../../constants/spacing';
 
 interface SectionHeaderProps {
@@ -33,12 +34,13 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 18,
+    fontFamily: fonts.display,
+    fontSize: 17,
     fontWeight: '600',
   },
   subtitle: {
-    color: colors.textSecondary,
-    fontSize: 14,
+    color: colors.textMuted,
+    fontSize: 13,
   },
 });
 

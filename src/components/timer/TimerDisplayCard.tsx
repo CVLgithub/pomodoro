@@ -10,6 +10,12 @@ const modeLabels: Record<TimerMode, string> = {
   longBreak: 'Lange Pause',
 };
 
+const modeColor: Record<TimerMode, string> = {
+  focus: colors.accent,
+  shortBreak: colors.success,
+  longBreak: colors.warning,
+};
+
 interface TimerDisplayCardProps {
   mode: TimerMode;
   status: TimerStatus;
@@ -22,60 +28,66 @@ export const TimerDisplayCard = ({
   status,
   formattedRemaining,
   progress,
-}: TimerDisplayCardProps) => (
-  <View style={styles.card}>
-    <Text style={styles.kicker}>{modeLabels[mode]}</Text>
-    <Text style={styles.clock}>{formattedRemaining}</Text>
-    <Text style={styles.status}>
-      {status === 'running' ? 'Läuft' : status === 'paused' ? 'Pausiert' : 'Bereit'}
-    </Text>
-    <View style={styles.progressTrack}>
-      <View
-        style={[
-          styles.progressFill,
-          { width: `${Math.max(0, Math.min(progress, 1)) * 100}%` },
-        ]}
-      />
+}: TimerDisplayCardProps) => {
+  const color = modeColor[mode];
+  return (
+    <View style={styles.card}>
+      <View style={[styles.modePill, { backgroundColor: `${color}26` }]}>
+        <View style={[styles.dot, { backgroundColor: color }]} />
+        <Text style={[styles.kicker, { color }]}>{modeLabels[mode]}</Text>
+      </View>
+      <Text style={styles.clock} numberOfLines={1} adjustsFontSizeToFit>
+        {formattedRemaining}
+      </Text>
+      <Text style={styles.status}>
+        {status === 'running' ? 'Läuft' : status === 'paused' ? 'Pausiert' : 'Bereit'}
+      </Text>
+      <View style={styles.progressTrack}>
+        <View
+          style={[
+            styles.progressFill,
+            { backgroundColor: color, width: `${Math.max(0, Math.min(progress, 1)) * 100}%` },
+          ]}
+        />
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   card: {
     borderRadius: radii.xl,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xl,
-    gap: spacing.md,
+    paddingVertical: spacing['3xl'] + spacing.md,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.lg,
     alignItems: 'center',
   },
-  kicker: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+  modePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
   },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  kicker: { fontSize: 13, fontWeight: '700', letterSpacing: 0.6 },
   clock: {
     color: colors.textPrimary,
-    fontSize: 56,
-    fontWeight: '700',
+    fontSize: 88,
+    lineHeight: 96,
+    fontWeight: '200',
+    letterSpacing: -2,
+    fontVariant: ['tabular-nums'],
   },
-  status: {
-    color: colors.textSecondary,
-    fontSize: 15,
-  },
+  status: { color: colors.textMuted, fontSize: 14, fontWeight: '500' },
   progressTrack: {
-    width: '100%',
-    height: 10,
+    width: '60%',
+    height: 4,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.pill,
     overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: radii.pill,
-  },
+  progressFill: { height: '100%', borderRadius: radii.pill },
 });
-

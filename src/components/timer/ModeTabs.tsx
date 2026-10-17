@@ -40,16 +40,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radii.pill,
     padding: spacing.xs,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.md,
-    borderRadius: radii.md,
+    borderRadius: radii.pill,
   },
   tabActive: {
     backgroundColor: colors.surfaceElevated,

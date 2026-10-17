@@ -115,6 +115,6 @@ const styles = StyleSheet.create({
   },
   completedCard: {
     backgroundColor: colors.surfaceMuted,
-    borderColor: 'rgba(70, 195, 123, 0.22)',
+    borderColor: 'rgba(95, 211, 141, 0.22)',
   },
 });

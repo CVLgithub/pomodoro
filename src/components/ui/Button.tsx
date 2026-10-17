@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
+import { fonts } from '../../constants/fonts';
 import { radii, spacing } from '../../constants/spacing';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -41,8 +42,8 @@ export const Button = ({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 48,
-    borderRadius: radii.md,
+    minHeight: 52,
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.lg,
     justifyContent: 'center',
     alignItems: 'center',
@@ -55,7 +56,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   label: {
-    fontSize: 15,
+    fontFamily: fonts.display,
+    fontSize: 16,
     fontWeight: '600',
   },
   pressed: {
@@ -71,24 +73,29 @@ const variantStyles = StyleSheet.create({
   primary: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   secondary: {
     backgroundColor: colors.surfaceElevated,
-    borderColor: colors.border,
+    borderColor: colors.surfaceElevated,
   },
   ghost: {
     backgroundColor: 'transparent',
-    borderColor: colors.border,
+    borderColor: colors.surfaceElevated,
   },
   danger: {
-    backgroundColor: 'rgba(255, 107, 107, 0.16)',
-    borderColor: 'rgba(255, 107, 107, 0.35)',
+    backgroundColor: 'rgba(255, 92, 108, 0.16)',
+    borderColor: 'rgba(255, 92, 108, 0.35)',
   },
 });
 
 const labelStyles = StyleSheet.create({
   primary: {
-    color: colors.background,
+    color: '#1A0B06',
   },
   secondary: {
     color: colors.textPrimary,

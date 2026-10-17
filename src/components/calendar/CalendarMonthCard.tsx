@@ -41,7 +41,7 @@ export const CalendarMonthCard = ({
         dayTextColor: colors.textPrimary,
         monthTextColor: colors.textPrimary,
         arrowColor: colors.accent,
-        textDisabledColor: '#394150',
+        textDisabledColor: '#3A3F4A',
       }}
       style={styles.calendar}
       enableSwipeMonths
