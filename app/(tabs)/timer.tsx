@@ -6,12 +6,10 @@ import { DurationWheelPicker } from '../../src/components/timer/DurationWheelPic
 import { ModeTabs } from '../../src/components/timer/ModeTabs';
 import { TaskAssignmentCard } from '../../src/components/timer/TaskAssignmentCard';
 import { TimerDisplayCard } from '../../src/components/timer/TimerDisplayCard';
-import { IconButton } from '../../src/components/ui/IconButton';
-import { RoundButton } from '../../src/components/ui/RoundButton';
+import { Button } from '../../src/components/ui/Button';
 import { Screen } from '../../src/components/ui/Screen';
 import { SectionCard } from '../../src/components/ui/SectionCard';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
-import { colors } from '../../src/constants/colors';
 import { useTimer } from '../../src/hooks/useTimer';
 import { useSessionsStore } from '../../src/store/sessionsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
@@ -60,7 +58,7 @@ export default function TimerScreen() {
     <Screen
       title="Timer"
       subtitle="Starte und steuere deine aktuelle Session."
-      headerRight={<IconButton name="settings-outline" accessibilityLabel="Einstellungen" onPress={() => router.push('/settings')} />}
+      headerRight={<Button label="Einstellungen" variant="ghost" onPress={() => router.push('/settings')} />}
     >
       <ModeTabs
         value={timer.activeMode}
@@ -74,53 +72,43 @@ export default function TimerScreen() {
         formattedRemaining={timer.formattedRemaining}
         progress={timer.progress}
       />
-<View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-evenly', paddingVertical: 8 }}>
-        <RoundButton
-          icon="refresh"
-          label="Reset"
-          onPress={() => void runSafely(reset, 'Timer konnte nicht zurückgesetzt werden')}
+<SectionCard>
+        <SectionHeader
+          title="Steuerung"
+          subtitle={
+            timer.activeMode === 'longBreak' && timer.status === 'idle'
+              ? 'Die lange Pause ist bereit.'
+              : 'Start, Pause und Ende steuerst du hier.'
+          }
         />
-        {timer.status === 'idle' ? (
-          <RoundButton
-            size="lg"
-            variant="primary"
-            icon="play"
-            label="Start"
-            onPress={() => void runSafely(start, 'Timer konnte nicht gestartet werden')}
+        <View style={{ gap: 12 }}>
+          {timer.status === 'idle' ? (
+            <Button label="Start" onPress={() => void runSafely(start, 'Timer konnte nicht gestartet werden')} />
+          ) : null}
+          {timer.status === 'running' ? (
+            <Button
+              label="Pause"
+              variant="secondary"
+              onPress={() => void runSafely(pause, 'Timer konnte nicht pausiert werden')}
+            />
+          ) : null}
+          {timer.status === 'paused' ? (
+            <Button label="Weiter" onPress={() => void runSafely(resume, 'Timer konnte nicht fortgesetzt werden')} />
+          ) : null}
+          {timer.status !== 'idle' ? (
+            <Button
+              label="Jetzt beenden"
+              variant="danger"
+              onPress={() => void runSafely(finishNow, 'Timer konnte nicht beendet werden')}
+            />
+          ) : null}
+          <Button
+            label="Reset"
+            variant="ghost"
+            onPress={() => void runSafely(reset, 'Timer konnte nicht zurückgesetzt werden')}
           />
-        ) : timer.status === 'running' ? (
-          <RoundButton
-            size="lg"
-            variant="primary"
-            icon="pause"
-            label="Pause"
-            onPress={() => void runSafely(pause, 'Timer konnte nicht pausiert werden')}
-          />
-        ) : (
-          <RoundButton
-            size="lg"
-            variant="primary"
-            icon="play"
-            label="Weiter"
-            onPress={() => void runSafely(resume, 'Timer konnte nicht fortgesetzt werden')}
-          />
-        )}
-        {timer.status !== 'idle' ? (
-          <RoundButton
-            variant="danger"
-            icon="stop"
-            label="Beenden"
-            onPress={() => void runSafely(finishNow, 'Timer konnte nicht beendet werden')}
-          />
-        ) : (
-          <View style={{ width: 60 }} />
-        )}
-      </View>
-      {timer.activeMode === 'longBreak' && timer.status === 'idle' ? (
-        <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: 'center' }}>
-          Die lange Pause ist bereit.
-        </Text>
-      ) : null}
+        </View>
+      </SectionCard>
       <TaskAssignmentCard
         title="Aktuelle Zuordnung"
         tasks={tasks}
@@ -132,7 +120,7 @@ export default function TimerScreen() {
       />
 
       <SectionCard>
-        <SectionHeader title="Dauer" subtitle="Minuten pro Phase" />
+        <SectionHeader title="Dauer" subtitle="Passe die Timer-Dauer an." />
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <DurationWheelPicker
             label="Fokus"

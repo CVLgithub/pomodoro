@@ -3,8 +3,7 @@ import { useRouter } from 'expo-router';
 import { useShallow } from 'zustand/react/shallow';
 
 import { TaskAssignmentCard } from '../../src/components/timer/TaskAssignmentCard';
-import { IconButton } from '../../src/components/ui/IconButton';
-import { RoundButton } from '../../src/components/ui/RoundButton';
+import { Button } from '../../src/components/ui/Button';
 import { Screen } from '../../src/components/ui/Screen';
 import { SectionCard } from '../../src/components/ui/SectionCard';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
@@ -47,7 +46,7 @@ export default function TodayScreen() {
     <Screen
       title="Heute"
       subtitle="Stoppuhr für deine heutige Arbeit."
-      headerRight={<IconButton name="settings-outline" accessibilityLabel="Einstellungen" onPress={() => router.push('/settings')} />}
+      headerRight={<Button label="Einstellungen" variant="ghost" onPress={() => router.push('/settings')} />}
     >
       <SectionCard>
         <SectionHeader
@@ -93,28 +92,22 @@ export default function TodayScreen() {
         </View>
         <View style={styles.controls}>
           {!isRunning ? (
-            <RoundButton
-              size="lg"
-              variant="primary"
-              icon="play"
+            <Button
               label="Start"
               onPress={() => void runSafely(start, 'Stoppuhr konnte nicht gestartet werden')}
             />
           ) : (
             <>
-              <RoundButton
-                size="lg"
-                variant="primary"
-                icon={isActivePhase ? 'pause' : 'play'}
+              <Button
                 label={isActivePhase ? 'Pause' : 'Weiter'}
+                variant={isActivePhase ? 'secondary' : 'primary'}
                 onPress={() =>
                   void runSafely(switchPhase, 'Stoppuhr konnte nicht fortgesetzt werden')
                 }
               />
-              <RoundButton
-                variant="danger"
-                icon="stop"
+              <Button
                 label="Session beenden"
+                variant="danger"
                 onPress={() => void runSafely(stop, 'Session konnte nicht beendet werden')}
               />
             </>
@@ -155,10 +148,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
   },
   activePill: {
-    backgroundColor: 'rgba(95, 211, 141, 0.16)',
+    backgroundColor: 'rgba(70, 195, 123, 0.16)',
   },
   breakPill: {
-    backgroundColor: 'rgba(255, 194, 102, 0.16)',
+    backgroundColor: 'rgba(255, 182, 85, 0.16)',
   },
   statusPillLabel: {
     fontSize: 12,
@@ -175,18 +168,13 @@ const styles = StyleSheet.create({
   },
   clockLabel: {
     color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 2,
+    fontSize: 14,
     textTransform: 'uppercase',
   },
   clock: {
     color: colors.textPrimary,
-    fontSize: 80,
-    lineHeight: 88,
-    fontWeight: '200',
-    letterSpacing: -1.5,
-    fontVariant: ['tabular-nums'],
+    fontSize: 56,
+    fontWeight: '700',
   },
   secondaryClock: {
     color: colors.textSecondary,
@@ -197,10 +185,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   controls: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    gap: 40,
-    paddingTop: 4,
+    gap: 12,
   },
 });

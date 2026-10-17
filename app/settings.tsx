@@ -974,7 +974,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 92, 108, 0.3)',
+    borderColor: 'rgba(255, 107, 107, 0.3)',
     borderRadius: radii.sm,
   },
   tagGroupDeleteLabel: {

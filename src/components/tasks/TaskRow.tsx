@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(95, 211, 141, 0.18)',
+    borderColor: 'rgba(70, 195, 123, 0.18)',
     opacity: 0.8,
   },
   checkbox: {
@@ -164,8 +164,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255, 107, 74, 0.28)',
-    backgroundColor: 'rgba(255, 107, 74, 0.12)',
+    borderColor: 'rgba(94, 162, 255, 0.28)',
+    backgroundColor: 'rgba(94, 162, 255, 0.12)',
   },
   recurrenceLabel: {
     color: colors.accent,

@@ -15,8 +15,10 @@ export const SectionCard = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radii.lg,
-    padding: spacing.xl,
-    gap: spacing.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
 });

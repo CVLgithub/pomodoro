@@ -703,7 +703,7 @@ const styles = StyleSheet.create({
   },
   optionChipActive: {
     borderColor: colors.accent,
-    backgroundColor: 'rgba(255, 107, 74, 0.14)',
+    backgroundColor: 'rgba(94, 162, 255, 0.14)',
   },
   optionChipLabel: {
     color: colors.textSecondary,
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   },
   weekdayChipActive: {
     borderColor: colors.accent,
-    backgroundColor: 'rgba(255, 107, 74, 0.14)',
+    backgroundColor: 'rgba(94, 162, 255, 0.14)',
   },
   weekdayChipLabel: {
     color: colors.textSecondary,
@@ -804,7 +804,7 @@ const styles = StyleSheet.create({
   },
   groupOptionSelected: {
     borderColor: colors.accent,
-    backgroundColor: 'rgba(255, 107, 74, 0.14)',
+    backgroundColor: 'rgba(94, 162, 255, 0.14)',
   },
   groupOptionLabel: {
     color: colors.textSecondary,
@@ -866,7 +866,7 @@ const styles = StyleSheet.create({
   },
   modalRowSelected: {
     borderColor: colors.accent,
-    backgroundColor: 'rgba(255, 107, 74, 0.14)',
+    backgroundColor: 'rgba(94, 162, 255, 0.14)',
   },
   modalSelected: {
     color: colors.accent,

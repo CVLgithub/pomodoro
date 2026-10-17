@@ -274,8 +274,8 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radii.lg,
     borderWidth: 1.5,
-    borderColor: 'rgba(160, 167, 180, 0.35)',
-    backgroundColor: 'rgba(24, 27, 33, 0.92)',
+    borderColor: 'rgba(151, 163, 182, 0.35)',
+    backgroundColor: 'rgba(21, 27, 35, 0.92)',
   },
   statusSectionHeader: {
     gap: spacing.xs,
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: 'rgba(95, 211, 141, 0.16)',
+    borderColor: 'rgba(70, 195, 123, 0.16)',
     backgroundColor: colors.surface,
   },
   modalTitle: {

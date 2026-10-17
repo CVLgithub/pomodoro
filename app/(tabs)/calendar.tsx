@@ -60,7 +60,7 @@ export default function CalendarScreen() {
       (accumulator, occurrence) => {
         accumulator[occurrence.occurrenceDate] = {
           marked: true,
-          dotColor: tagsById[occurrence.task.tagId]?.color ?? '#FF6B4A',
+          dotColor: tagsById[occurrence.task.tagId]?.color ?? '#5EA2FF',
         };
         return accumulator;
       },

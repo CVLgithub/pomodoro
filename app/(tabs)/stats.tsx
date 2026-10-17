@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import { SessionDayGroup } from '../../src/components/stats/SessionDayGroup';
 import { StatSummaryCard } from '../../src/components/stats/StatSummaryCard';
 import { Button } from '../../src/components/ui/Button';
-import { IconButton } from '../../src/components/ui/IconButton';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { ModalSheet } from '../../src/components/ui/ModalSheet';
 import { Screen } from '../../src/components/ui/Screen';
@@ -118,7 +117,7 @@ export default function StatsScreen() {
     <Screen
       title="Statistik"
       subtitle="Deine abgeschlossenen Sessions im Überblick."
-      headerRight={<IconButton name="settings-outline" accessibilityLabel="Einstellungen" onPress={() => router.push('/settings')} />}
+      headerRight={<Button label="Einstellungen" variant="ghost" onPress={() => router.push('/settings')} />}
     >
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         <StatSummaryCard label="Heute" value={formatMinutesShort(todayMinutes)} />

@@ -52,7 +52,7 @@ type GroupStat = {
 const CHART_HEIGHT = 220;
 const WEEK_BAR_WIDTH = 34;
 const MONTH_BAR_WIDTH = 20;
-const FALLBACK_TAG_COLOR = '#6B7280';
+const FALLBACK_TAG_COLOR = '#6C7687';
 
 const dayLabelFormatter = new Intl.DateTimeFormat('de-DE', { weekday: 'short' });
 const dateLabelFormatter = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' });
@@ -846,7 +846,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderStyle: 'dashed',
-    backgroundColor: 'rgba(107, 114, 128, 0.12)',
+    backgroundColor: 'rgba(108, 118, 135, 0.12)',
   },
   dayLabel: {
     color: colors.textPrimary,

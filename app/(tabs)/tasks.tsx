@@ -254,8 +254,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
   },
   tagGroupToggleCompleted: {
-    backgroundColor: 'rgba(24, 27, 33, 0.86)',
-    borderColor: 'rgba(160, 167, 180, 0.28)',
+    backgroundColor: 'rgba(21, 27, 35, 0.86)',
+    borderColor: 'rgba(151, 163, 182, 0.28)',
   },
   tagGroupToggleCopy: {
     flex: 1,
@@ -327,15 +327,15 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radii.xl,
     borderWidth: 1.5,
-    borderColor: 'rgba(160, 167, 180, 0.35)',
-    backgroundColor: 'rgba(24, 27, 33, 0.92)',
+    borderColor: 'rgba(151, 163, 182, 0.35)',
+    backgroundColor: 'rgba(21, 27, 35, 0.92)',
     gap: spacing.lg,
   },
   completedSectionHeader: {
     gap: spacing.xs,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(160, 167, 180, 0.2)',
+    borderBottomColor: 'rgba(151, 163, 182, 0.2)',
   },
   completedEyebrow: {
     color: colors.success,
