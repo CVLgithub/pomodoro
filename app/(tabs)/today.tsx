@@ -148,10 +148,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
   },
   activePill: {
-    backgroundColor: 'rgba(70, 195, 123, 0.16)',
+    backgroundColor: 'rgba(95, 211, 141, 0.16)',
   },
   breakPill: {
-    backgroundColor: 'rgba(255, 182, 85, 0.16)',
+    backgroundColor: 'rgba(255, 194, 102, 0.16)',
   },
   statusPillLabel: {
     fontSize: 12,
@@ -168,13 +168,17 @@ const styles = StyleSheet.create({
   },
   clockLabel: {
     color: colors.textSecondary,
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 2,
     textTransform: 'uppercase',
   },
   clock: {
     color: colors.textPrimary,
-    fontSize: 56,
-    fontWeight: '700',
+    fontSize: 72,
+    fontWeight: '200',
+    letterSpacing: -1.5,
+    fontVariant: ['tabular-nums'],
   },
   secondaryClock: {
     color: colors.textSecondary,

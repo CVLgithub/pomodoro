@@ -304,8 +304,8 @@ const styles = StyleSheet.create({
   statusBadge: {
     borderRadius: radii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(94, 162, 255, 0.28)',
-    backgroundColor: 'rgba(94, 162, 255, 0.12)',
+    borderColor: 'rgba(255, 107, 74, 0.28)',
+    backgroundColor: 'rgba(255, 107, 74, 0.12)',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },

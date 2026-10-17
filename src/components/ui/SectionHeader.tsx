@@ -33,8 +33,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   subtitle: {
     color: colors.textSecondary,

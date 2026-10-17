@@ -17,6 +17,12 @@ interface TimerDisplayCardProps {
   progress: number;
 }
 
+const modeColor: Record<TimerMode, string> = {
+  focus: colors.accent,
+  shortBreak: colors.success,
+  longBreak: colors.warning,
+};
+
 export const TimerDisplayCard = ({
   mode,
   status,
@@ -24,7 +30,7 @@ export const TimerDisplayCard = ({
   progress,
 }: TimerDisplayCardProps) => (
   <View style={styles.card}>
-    <Text style={styles.kicker}>{modeLabels[mode]}</Text>
+    <Text style={[styles.kicker, { color: modeColor[mode] }]}>{modeLabels[mode]}</Text>
     <Text style={styles.clock}>{formattedRemaining}</Text>
     <Text style={styles.status}>
       {status === 'running' ? 'Läuft' : status === 'paused' ? 'Pausiert' : 'Bereit'}
@@ -33,7 +39,7 @@ export const TimerDisplayCard = ({
       <View
         style={[
           styles.progressFill,
-          { width: `${Math.max(0, Math.min(progress, 1)) * 100}%` },
+          { backgroundColor: modeColor[mode], width: `${Math.max(0, Math.min(progress, 1)) * 100}%` },
         ]}
       />
     </View>
@@ -46,20 +52,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.xl,
-    gap: spacing.md,
+    paddingVertical: spacing['3xl'],
+    paddingHorizontal: spacing.xl,
+    gap: spacing.lg,
     alignItems: 'center',
   },
   kicker: {
     color: colors.textSecondary,
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    letterSpacing: 2.4,
   },
   clock: {
     color: colors.textPrimary,
-    fontSize: 56,
-    fontWeight: '700',
+    fontSize: 84,
+    fontWeight: '200',
+    letterSpacing: -2,
+    fontVariant: ['tabular-nums'],
   },
   status: {
     color: colors.textSecondary,
@@ -67,7 +77,7 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     width: '100%',
-    height: 10,
+    height: 6,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.pill,
     overflow: 'hidden',

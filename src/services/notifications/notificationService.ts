@@ -96,7 +96,7 @@ const ensureConfigured = async (): Promise<ExpoNotificationsModule | null> => {
       name: 'Timer',
       sound: 'default',
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#5EA2FF',
+      lightColor: '#FF6B4A',
     });
   }
 

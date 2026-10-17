@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.xs,
@@ -49,10 +49,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.md,
-    borderRadius: radii.md,
+    borderRadius: radii.pill,
   },
   tabActive: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.accent,
   },
   label: {
     color: colors.textSecondary,
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   labelActive: {
-    color: colors.textPrimary,
+    color: '#1A0B06',
   },
 });
 

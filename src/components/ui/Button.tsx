@@ -41,8 +41,8 @@ export const Button = ({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 48,
-    borderRadius: radii.md,
+    minHeight: 52,
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.lg,
     justifyContent: 'center',
     alignItems: 'center',
@@ -56,7 +56,8 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   pressed: {
     opacity: 0.86,
@@ -71,6 +72,11 @@ const variantStyles = StyleSheet.create({
   primary: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   secondary: {
     backgroundColor: colors.surfaceElevated,
@@ -81,14 +87,14 @@ const variantStyles = StyleSheet.create({
     borderColor: colors.border,
   },
   danger: {
-    backgroundColor: 'rgba(255, 107, 107, 0.16)',
-    borderColor: 'rgba(255, 107, 107, 0.35)',
+    backgroundColor: 'rgba(255, 92, 108, 0.16)',
+    borderColor: 'rgba(255, 92, 108, 0.35)',
   },
 });
 
 const labelStyles = StyleSheet.create({
   primary: {
-    color: colors.background,
+    color: '#1A0B06',
   },
   secondary: {
     color: colors.textPrimary,

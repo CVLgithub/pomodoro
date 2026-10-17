@@ -89,9 +89,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 31,
-    lineHeight: 36,
-    fontWeight: '700',
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: '800',
+    letterSpacing: -0.6,
   },
   subtitle: {
     color: colors.textSecondary,
@@ -102,10 +103,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -80,
     right: -40,
-    width: 240,
-    height: 240,
+    width: 300,
+    height: 300,
     borderRadius: radii.pill,
-    backgroundColor: 'rgba(94, 162, 255, 0.08)',
+    backgroundColor: 'rgba(255, 107, 74, 0.10)',
   },
   backgroundOrbSecondary: {
     position: 'absolute',
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: radii.pill,
-    backgroundColor: 'rgba(70, 195, 123, 0.05)',
+    backgroundColor: 'rgba(95, 211, 141, 0.05)',
   },
 });
 

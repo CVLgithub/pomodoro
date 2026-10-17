@@ -17,12 +17,20 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.textPrimary,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: '#0A0E14',
-          borderTopColor: colors.border,
+          backgroundColor: colors.surface,
+          borderTopWidth: 0,
+          height: 84,
+          paddingTop: 8,
+          shadowColor: colors.shadow,
+          shadowOpacity: 0.4,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: -6 },
+          elevation: 12,
         },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
         tabBarIcon: ({ color, size }) => (
           <Ionicon name={icons[route.name]} color={String(color)} size={size} />
         ),
