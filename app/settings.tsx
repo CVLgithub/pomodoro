@@ -22,6 +22,7 @@ import { useSyncStore } from '../src/store/syncStore';
 import { useTagsStore } from '../src/store/tagsStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { NotificationPreferences } from '../src/types/notifications';
+import { START_PAGE_OPTIONS } from '../src/types/settings';
 import type { Tag } from '../src/types/tag';
 import { addMinutes, formatDateKey, formatTimeLabel, toLocalIsoString } from '../src/utils/date';
 import {
@@ -224,11 +225,13 @@ export default function SettingsScreen() {
   const backendUrl = useSettingsStore((state) => state.backendUrl);
   const notificationPreferences = useSettingsStore((state) => state.notificationPreferences);
   const autoSwitchToBreaks = useSettingsStore((state) => state.autoSwitchToBreaks);
+  const startPage = useSettingsStore((state) => state.startPage);
   const tagGroups = useSettingsStore((state) => state.tagGroups);
   const deleteTagGroup = useSettingsStore((state) => state.deleteTagGroup);
   const saveBackendUrl = useSettingsStore((state) => state.saveBackendUrl);
   const saveNotificationPreferences = useSettingsStore((state) => state.saveNotificationPreferences);
   const saveAutoSwitchToBreaks = useSettingsStore((state) => state.saveAutoSwitchToBreaks);
+  const saveStartPage = useSettingsStore((state) => state.saveStartPage);
   const createSessionEntry = useSessionsStore((state) => state.createSessionEntry);
   const updateTag = useTagsStore((state) => state.updateTag);
 
@@ -495,6 +498,43 @@ export default function SettingsScreen() {
         notificationPreferences={notificationPreferences}
         onSave={persistNotificationPreferences}
       />
+
+      <SectionCard>
+        <SectionHeader
+          title="Startseite"
+          subtitle="Wähle, welcher Bereich beim Öffnen der App erscheint."
+        />
+        <View style={styles.startPageOptions}>
+          {START_PAGE_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
+              accessibilityRole="button"
+              accessibilityState={{ selected: startPage === option.value }}
+              onPress={() => {
+                void saveStartPage(option.value).catch((error) => {
+                  Alert.alert(
+                    'Startseite konnte nicht gespeichert werden',
+                    error instanceof Error ? error.message : 'Unbekannter Fehler',
+                  );
+                });
+              }}
+              style={[
+                styles.startPageOption,
+                startPage === option.value ? styles.startPageOptionSelected : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.startPageOptionLabel,
+                  startPage === option.value ? styles.startPageOptionLabelSelected : null,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </SectionCard>
 
       <SectionCard>
         <SectionHeader
@@ -823,6 +863,32 @@ const styles = StyleSheet.create({
   },
   manualSessionTags: {
     gap: spacing.sm,
+  },
+  startPageOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  startPageOption: {
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceMuted,
+  },
+  startPageOptionSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
+  },
+  startPageOptionLabel: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  startPageOptionLabelSelected: {
+    color: colors.textPrimary,
   },
   tagOptions: {
     flexDirection: 'row',

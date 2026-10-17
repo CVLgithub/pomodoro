@@ -17,6 +17,7 @@ import { useSettingsStore } from '../src/store/settingsStore';
 import { useSyncStore } from '../src/store/syncStore';
 import { useTagsStore } from '../src/store/tagsStore';
 import { useTasksStore } from '../src/store/tasksStore';
+import { useStopwatchStore } from '../src/store/stopwatchStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { useUiStore } from '../src/store/uiStore';
 
@@ -59,6 +60,7 @@ export default function RootLayout() {
           useSyncStore.getState().loadQueue(),
         ]);
         await useTimerStore.getState().hydrate();
+        await useStopwatchStore.getState().hydrate();
         await useTimerStore.getState().reconcileWithClock();
 
         if (isMounted) {

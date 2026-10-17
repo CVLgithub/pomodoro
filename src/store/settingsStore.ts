@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { DEFAULT_AUTO_SWITCH_TO_BREAKS, DEFAULT_BACKEND_URL } from '../constants/config';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../constants/notifications';
 import { NotificationPreferences } from '../types/notifications';
+import { DEFAULT_START_PAGE, StartPage } from '../types/settings';
 import { syncManager } from '../services/sync/syncManager';
 import { toTagGroupsPushPayload } from '../services/sync/payloads';
 import { useSyncStore } from './syncStore';
@@ -10,10 +11,12 @@ import {
   getNotificationPreferences,
   getBackendUrlSetting,
   getAutoSwitchToBreaksSetting,
+  getStartPageSetting,
   getTagGroupsSetting,
   saveNotificationPreferences,
   saveBackendUrlSetting,
   saveAutoSwitchToBreaksSetting,
+  saveStartPageSetting,
   saveTagGroupsSetting,
 } from '../db/repositories/settingsRepository';
 import { normalizeCustomTagGroupName } from '../utils/tagGroups';
@@ -22,12 +25,14 @@ interface SettingsStoreState {
   backendUrl: string;
   notificationPreferences: NotificationPreferences;
   autoSwitchToBreaks: boolean;
+  startPage: StartPage;
   tagGroups: string[];
   isHydrated: boolean;
   loadSettings: () => Promise<void>;
   saveBackendUrl: (value: string) => Promise<void>;
   saveNotificationPreferences: (value: NotificationPreferences) => Promise<void>;
   saveAutoSwitchToBreaks: (value: boolean) => Promise<void>;
+  saveStartPage: (value: StartPage) => Promise<void>;
   createTagGroup: (value: string) => Promise<string>;
   deleteTagGroup: (value: string) => Promise<void>;
 }
@@ -59,16 +64,25 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   backendUrl: normalizeBackendUrl(DEFAULT_BACKEND_URL),
   notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
   autoSwitchToBreaks: DEFAULT_AUTO_SWITCH_TO_BREAKS,
+  startPage: DEFAULT_START_PAGE,
   tagGroups: [],
   isHydrated: false,
   loadSettings: async () => {
     const backendUrl = normalizeBackendUrl(await getBackendUrlSetting());
-    const [notificationPreferences, autoSwitchToBreaks, tagGroups] = await Promise.all([
+    const [notificationPreferences, autoSwitchToBreaks, tagGroups, startPage] = await Promise.all([
       getNotificationPreferences(),
       getAutoSwitchToBreaksSetting(),
       getTagGroupsSetting(),
+      getStartPageSetting(),
     ]);
-    set({ backendUrl, notificationPreferences, autoSwitchToBreaks, tagGroups, isHydrated: true });
+    set({
+      backendUrl,
+      notificationPreferences,
+      autoSwitchToBreaks,
+      tagGroups,
+      startPage,
+      isHydrated: true,
+    });
   },
   saveBackendUrl: async (value) => {
     const backendUrl = assertValidBackendUrl(value);
@@ -82,6 +96,10 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   saveAutoSwitchToBreaks: async (value) => {
     const autoSwitchToBreaks = await saveAutoSwitchToBreaksSetting(value);
     set({ autoSwitchToBreaks, isHydrated: true });
+  },
+  saveStartPage: async (value) => {
+    const startPage = await saveStartPageSetting(value);
+    set({ startPage, isHydrated: true });
   },
   createTagGroup: async (value) => {
     const groupName = normalizeCustomTagGroupName(value);

@@ -1,6 +1,7 @@
 import { DEFAULT_AUTO_SWITCH_TO_BREAKS, DEFAULT_BACKEND_URL } from '../../constants/config';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../../constants/notifications';
 import { NotificationPreferences } from '../../types/notifications';
+import { DEFAULT_START_PAGE, isStartPage, StartPage } from '../../types/settings';
 import { toLocalIsoString } from '../../utils/date';
 import { normalizeTagGroupNames } from '../../utils/tagGroups';
 import { getDatabase } from '../client';
@@ -16,6 +17,7 @@ const DAILY_FOCUS_GOAL_HOURS_KEY = 'dailyFocusGoalHours';
 const DAILY_FOCUS_GOAL_NOTIFIED_DATE_KEY = 'dailyFocusGoalNotifiedDate';
 const AUTO_SWITCH_TO_BREAKS_KEY = 'autoSwitchToBreaks';
 const TAG_GROUPS_KEY = 'tagGroups';
+const START_PAGE_KEY = 'startPage';
 
 const parseTagGroupsSetting = (value?: string): string[] => {
   if (!value) {
@@ -126,6 +128,33 @@ export const saveAutoSwitchToBreaksSetting = async (value: boolean): Promise<boo
     `,
     AUTO_SWITCH_TO_BREAKS_KEY,
     value ? 'true' : 'false',
+    toLocalIsoString(),
+  );
+
+  return value;
+};
+
+export const getStartPageSetting = async (): Promise<StartPage> => {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<SettingRow>(
+    'SELECT value FROM app_settings WHERE key = ?;',
+    START_PAGE_KEY,
+  );
+
+  return row?.value && isStartPage(row.value) ? row.value : DEFAULT_START_PAGE;
+};
+
+export const saveStartPageSetting = async (value: StartPage): Promise<StartPage> => {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `
+      INSERT INTO app_settings (key, value, updatedAt)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt;
+    `,
+    START_PAGE_KEY,
+    value,
     toLocalIsoString(),
   );
 
