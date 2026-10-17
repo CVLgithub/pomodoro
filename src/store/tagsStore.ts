@@ -21,6 +21,7 @@ import { CreateTagInput, Tag, UpdateTagInput } from '../types/tag';
 import { useSessionsStore } from './sessionsStore';
 import { useSyncStore } from './syncStore';
 import { useTasksStore } from './tasksStore';
+import { useStopwatchStore } from './stopwatchStore';
 import { useTimerStore } from './timerStore';
 
 interface TagsStoreState {
@@ -102,6 +103,7 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
       useTasksStore.getState().loadTasks(),
       useSessionsStore.getState().loadSessions(),
       useTimerStore.getState().handleDeletedTag(id),
+      useStopwatchStore.getState().handleDeletedTag(id),
     ]);
 
     await syncReassignedEntities(result);

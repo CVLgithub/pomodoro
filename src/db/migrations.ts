@@ -121,6 +121,24 @@ const migrations: readonly Migration[] = [
       }
     },
   },
+  {
+    version: 7,
+    statements: () => [
+      `
+        CREATE TABLE IF NOT EXISTS stopwatch_state (
+          id TEXT PRIMARY KEY NOT NULL,
+          status TEXT NOT NULL,
+          phase TEXT NOT NULL,
+          sessionStartedAt TEXT,
+          phaseStartedAt TEXT,
+          activeElapsedSeconds INTEGER NOT NULL DEFAULT 0,
+          breakElapsedSeconds INTEGER NOT NULL DEFAULT 0,
+          selectedTaskId TEXT,
+          selectedTagId TEXT NOT NULL
+        );
+      `,
+    ],
+  },
 ] as const;
 
 export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> => {

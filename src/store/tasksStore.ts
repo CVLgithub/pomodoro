@@ -27,6 +27,7 @@ import {
 import { isTaskRecurring } from '../utils/taskRecurrence';
 import { useSessionsStore } from './sessionsStore';
 import { useSyncStore } from './syncStore';
+import { useStopwatchStore } from './stopwatchStore';
 import { useTimerStore } from './timerStore';
 
 interface TasksStoreState {
@@ -98,6 +99,7 @@ export const useTasksStore = create<TasksStoreState>((set, get) => ({
     const result = await deleteTaskRecord(id);
     await get().loadTasks();
     await useTimerStore.getState().handleDeletedTask(id);
+    await useStopwatchStore.getState().handleDeletedTask(id);
 
     for (const sessionId of result.affectedSessionIds) {
       const session = await getSessionById(sessionId);
