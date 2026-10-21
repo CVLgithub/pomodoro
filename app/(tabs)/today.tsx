@@ -136,6 +136,7 @@ const styles = StyleSheet.create({
   clockBlock: {
     alignItems: 'center',
     gap: 8,
+    minHeight: 132,
     paddingVertical: 8,
   },
   statusPill: {

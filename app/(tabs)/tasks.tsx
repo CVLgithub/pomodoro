@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -32,6 +32,26 @@ type TasksByTagGroup = {
   entries: TasksByTag[];
   taskCount: number;
 };
+
+const CompletedTasksToggle = ({
+  expanded,
+  onPress,
+}: {
+  expanded: boolean;
+  onPress: () => void;
+}) => (
+  <Pressable
+    accessibilityRole="button"
+    accessibilityState={{ expanded }}
+    onPress={onPress}
+    style={styles.completedToggle}
+  >
+    <Text style={styles.completedToggleLabel}>
+      {expanded ? 'Erledigte Aufgaben ausblenden' : 'Erledigte Aufgaben'}
+    </Text>
+    <Text style={styles.completedToggleHint}>{expanded ? '⌃' : '⌄'}</Text>
+  </Pressable>
+);
 
 const buildTasksByTagGroups = (
   tags: Tag[],
@@ -78,6 +98,7 @@ const buildTasksByTagGroups = (
 
 export default function TasksScreen() {
   const router = useRouter();
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
   const tasks = useTasksStore((state) => state.tasks);
   const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion);
   const tags = useTagsStore((state) => state.tags);
@@ -207,6 +228,14 @@ export default function TasksScreen() {
       title="Aufgaben"
       subtitle="Noch offene und bereits erledigte Aufgaben."
       headerRight={<Button label="Neu" variant="ghost" onPress={() => router.push('/task/new')} />}
+      footer={
+        completedTagGroups.length > 0 && !showCompletedTasks ? (
+          <CompletedTasksToggle
+            expanded={false}
+            onPress={() => setShowCompletedTasks(true)}
+          />
+        ) : null
+      }
     >
       {tasks.length === 0 ? (
         <EmptyState
@@ -218,21 +247,32 @@ export default function TasksScreen() {
       {renderTagGroups(openTagGroups, { collapseScope: 'open' })}
 
       {completedTagGroups.length > 0 ? (
-        <View style={styles.completedSection}>
-          <View style={styles.completedSectionHeader}>
-            <Text style={styles.completedEyebrow}>Erledigte Aufgaben</Text>
-            <Text style={styles.completedTitle}>Abgeschlossen</Text>
-            <Text style={styles.completedDescription}>
-              Diese Aufgaben sind bewusst separat vom aktiven Aufgabenbereich abgelegt.
-            </Text>
-          </View>
+        <View
+          style={styles.completedSection}
+        >
+          {showCompletedTasks ? (
+            <>
+              <CompletedTasksToggle
+                expanded
+                onPress={() => setShowCompletedTasks(false)}
+              />
+              <View style={styles.completedSectionHeader}>
+                <Text style={styles.completedEyebrow}>Erledigte Aufgaben</Text>
+                <Text style={styles.completedTitle}>Abgeschlossen</Text>
+                <Text style={styles.completedDescription}>
+                  Diese Aufgaben sind bewusst separat vom aktiven Aufgabenbereich abgelegt.
+                </Text>
+              </View>
 
-          <View style={styles.completedSectionList}>
-            {renderTagGroups(completedTagGroups, {
-              variant: 'completed',
-              collapseScope: 'completed',
-            })}
-          </View>
+              <View style={styles.completedSectionList}>
+                {renderTagGroups(completedTagGroups, {
+                  variant: 'completed',
+                  collapseScope: 'completed',
+                })}
+              </View>
+            </>
+          ) : null}
+
         </View>
       ) : null}
     </Screen>
@@ -329,11 +369,7 @@ const styles = StyleSheet.create({
   },
   completedSection: {
     marginTop: spacing['2xl'],
-    padding: spacing.lg,
-    borderRadius: radii.xl,
-    borderWidth: 1.5,
-    borderColor: 'rgba(151, 163, 182, 0.35)',
-    backgroundColor: 'rgba(21, 27, 35, 0.92)',
+    paddingBottom: spacing.lg,
     gap: spacing.lg,
   },
   completedSectionHeader: {
@@ -362,5 +398,23 @@ const styles = StyleSheet.create({
   },
   completedSectionList: {
     gap: spacing.md,
+  },
+  completedToggle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  completedToggleLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+    textDecorationColor: colors.textSecondary,
+  },
+  completedToggleHint: {
+    color: colors.textMuted,
+    fontSize: 16,
+    lineHeight: 16,
   },
 });

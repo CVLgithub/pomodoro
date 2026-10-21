@@ -17,6 +17,7 @@ interface ScreenProps {
   title: string;
   subtitle?: string;
   headerRight?: ReactNode;
+  footer?: ReactNode;
   children: ReactNode;
   scroll?: boolean;
   contentContainerStyle?: StyleProp<ViewStyle>;
@@ -26,6 +27,7 @@ export const Screen = ({
   title,
   subtitle,
   headerRight,
+  footer,
   children,
   scroll = true,
   contentContainerStyle,
@@ -59,6 +61,7 @@ export const Screen = ({
       ) : (
         <View style={[styles.container, styles.content, contentContainerStyle]}>{content}</View>
       )}
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </SafeAreaView>
   );
 };
@@ -75,6 +78,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing['3xl'],
     gap: spacing.lg,
+  },
+  footer: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -117,4 +129,3 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(70, 195, 123, 0.05)',
   },
 });
-
