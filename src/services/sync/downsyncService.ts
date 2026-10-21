@@ -1,33 +1,26 @@
-import { Platform } from 'react-native';
-
 import { GENERAL_TAG_ID, GENERAL_TAG_NAME } from '../../constants/config';
 import { getDatabase } from '../../db/client';
-import { getTagGroupsSetting } from '../../db/repositories/settingsRepository';
+import { listTagGroups } from '../../db/repositories/tagGroupsRepository';
 import { listSessions } from '../../db/repositories/sessionsRepository';
 import { listTags } from '../../db/repositories/tagsRepository';
 import { listTasks } from '../../db/repositories/tasksRepository';
 import { EntriesResponse, EntriesSession, EntriesTag, EntriesTask } from '../../types/api';
+import { TagGroup } from '../../types/tagGroup';
 import { Session } from '../../types/session';
 import { Tag } from '../../types/tag';
 import { Task } from '../../types/task';
 import { toLocalIsoString } from '../../utils/date';
 import {
-  getTagGroupLabel,
-  normalizeCustomTagGroupName,
-  normalizeTagGroupNames,
-} from '../../utils/tagGroups';
-import {
   formatTaskRecurrenceDays,
   normalizeTaskRecurrence,
 } from '../../utils/taskRecurrence';
 import { fetchEntries } from '../api/entriesService';
+import { syncManager } from './syncManager';
+import { mergeByUpdatedAt } from './syncPrimitives';
 
 const TIME_ONLY_PATTERN = /^\d{2}:\d{2}(?::\d{2})?$/;
-const TEMP_TAG_NAME_PREFIX = '__downsync_tag__';
-const TAG_GROUPS_SETTING_KEY = 'tagGroups';
-const TAG_GROUPS_ENTITY_ID = 'tagGroups';
 
-export type DownsyncEntityType = 'tag' | 'tagGroups' | 'task' | 'session';
+export type DownsyncEntityType = 'tag' | 'tagGroup' | 'task' | 'session';
 
 export interface DownsyncPreviewEntry {
   id: string;
@@ -41,29 +34,29 @@ export interface DownsyncPreviewEntry {
 }
 
 type NormalizedEntries = Omit<EntriesResponse, 'tagGroups'> & {
-  tagGroups: string[];
+  tagGroups: TagGroup[];
 };
 
 type LocalEntriesState = {
   tagsById: Map<string, Tag>;
   tasksById: Map<string, Task>;
   sessionsById: Map<string, Session>;
-  tagGroups: string[];
+  tagGroups: TagGroup[];
 };
 
 const DOWNYNC_TYPE_ORDER: Record<DownsyncEntityType, number> = {
-  session: 0,
-  tagGroups: 1,
-  tag: 2,
-  task: 3,
+  tagGroup: 0,
+  tag: 1,
+  task: 2,
+  session: 3,
 };
 
 const isGeneralTagName = (value: string): boolean =>
   value.trim().localeCompare(GENERAL_TAG_NAME, 'de-DE', { sensitivity: 'accent' }) === 0;
 
-const hasTagGroupName = (groupNames: string[], groupName: string): boolean =>
-  groupNames.some(
-    (entry) => entry.localeCompare(groupName, 'de-DE', { sensitivity: 'base' }) === 0,
+const hasTagGroupName = (groups: TagGroup[], groupName: string): boolean =>
+  groups.some(
+    (entry) => entry.name.localeCompare(groupName, 'de-DE', { sensitivity: 'base' }) === 0,
   );
 
 const toSessionDateTime = (dateKey: string, timeValue: string): string => {
@@ -89,7 +82,6 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
       ...tag,
       id: normalizedId,
       name: normalizedId === GENERAL_TAG_ID ? GENERAL_TAG_NAME : tag.name.trim(),
-      groupName: normalizeCustomTagGroupName(tag.groupName),
     };
 
     tagIdMap.set(tag.id, normalizedId);
@@ -101,10 +93,7 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
   }
 
   return {
-    tagGroups: normalizeTagGroupNames([
-      ...(entries.tagGroups ?? []),
-      ...Array.from(normalizedTagsMap.values()).map((tag) => tag.groupName),
-    ]),
+    tagGroups: entries.tagGroups ?? [],
     tags: Array.from(normalizedTagsMap.values()),
     tasks: entries.tasks.map((task) => ({
       ...task,
@@ -123,35 +112,19 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
 const fetchNormalizedEntries = async (): Promise<NormalizedEntries> =>
   normalizeEntries(await fetchEntries());
 
-const buildOpenTaskEntries = (entries: NormalizedEntries): NormalizedEntries => {
-  const openTasks = entries.tasks.filter((task) => !task.isCompleted);
-  const requiredTagIds = new Set(openTasks.map((task) => task.tagId));
-  const requiredTags = entries.tags.filter((tag) => requiredTagIds.has(tag.id));
-
-  return {
-    tagGroups: normalizeTagGroupNames(requiredTags.map((tag) => tag.groupName)),
-    tags: requiredTags,
-    tasks: openTasks,
-    sessions: [],
-  };
-};
-
 const loadLocalEntriesState = async (): Promise<LocalEntriesState> => {
   const [tags, tasks, sessions, savedTagGroups] = await Promise.all([
     listTags(),
     listTasks(),
     listSessions(),
-    getTagGroupsSetting(),
+    listTagGroups(),
   ]);
 
   return {
     tagsById: new Map(tags.map((tag) => [tag.id, tag])),
     tasksById: new Map(tasks.map((task) => [task.id, task])),
     sessionsById: new Map(sessions.map((session) => [session.id, session])),
-    tagGroups: normalizeTagGroupNames([
-      ...savedTagGroups,
-      ...tags.map((tag) => tag.groupName),
-    ]),
+    tagGroups: savedTagGroups,
   };
 };
 
@@ -161,7 +134,7 @@ const matchesTag = (localTag: Tag | undefined, remoteTag: EntriesTag): boolean =
       localTag.id === remoteTag.id &&
       localTag.name === remoteTag.name &&
       localTag.color === remoteTag.color &&
-      localTag.groupName === normalizeCustomTagGroupName(remoteTag.groupName) &&
+      localTag.groupId === remoteTag.groupId &&
       localTag.createdAt === remoteTag.createdAt &&
       localTag.updatedAt === remoteTag.updatedAt,
   );
@@ -220,110 +193,6 @@ const buildDependencyHint = (dependencies: string[]): string | undefined => {
   return `Übernimmt auch ${remainingDependencies.join(', ')} und ${lastDependency}.`;
 };
 
-const getConflictingTagIdByName = async (
-  db: Awaited<ReturnType<typeof getDatabase>>,
-  name: string,
-  id: string,
-): Promise<string | null> => {
-  const row = await db.getFirstAsync<{ id: string }>(
-    `
-      SELECT id
-      FROM tags
-      WHERE id != ? AND name = ? COLLATE NOCASE
-      LIMIT 1;
-    `,
-    id,
-    name,
-  );
-
-  return row?.id ?? null;
-};
-
-const adoptTagNameConflict = async (
-  db: Awaited<ReturnType<typeof getDatabase>>,
-  incomingTag: EntriesResponse['tags'][number],
-): Promise<void> => {
-  const conflictingTagId = await getConflictingTagIdByName(db, incomingTag.name, incomingTag.id);
-
-  if (!conflictingTagId) {
-    return;
-  }
-
-  const temporaryName = `${TEMP_TAG_NAME_PREFIX}${conflictingTagId}`;
-
-  await db.runAsync(
-    `
-      UPDATE tags
-      SET name = ?, updatedAt = ?
-      WHERE id = ?;
-    `,
-    temporaryName,
-    incomingTag.updatedAt,
-    conflictingTagId,
-  );
-
-  await db.runAsync(
-    `
-      INSERT INTO tags (id, name, color, groupName, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        name = excluded.name,
-        color = excluded.color,
-        groupName = excluded.groupName,
-        createdAt = excluded.createdAt,
-        updatedAt = excluded.updatedAt;
-    `,
-    incomingTag.id,
-    incomingTag.name,
-    incomingTag.color,
-    normalizeCustomTagGroupName(incomingTag.groupName),
-    incomingTag.createdAt,
-    incomingTag.updatedAt,
-  );
-
-  await db.runAsync(
-    `
-      UPDATE tasks
-      SET tagId = ?, updatedAt = ?
-      WHERE tagId = ?;
-    `,
-    incomingTag.id,
-    incomingTag.updatedAt,
-    conflictingTagId,
-  );
-
-  await db.runAsync(
-    `
-      UPDATE sessions
-      SET tagId = ?, syncStatus = 'synced'
-      WHERE tagId = ?;
-    `,
-    incomingTag.id,
-    conflictingTagId,
-  );
-
-  await db.runAsync(
-    `
-      UPDATE timer_state
-      SET selectedTagId = ?, updatedAt = ?
-      WHERE selectedTagId = ?;
-    `,
-    incomingTag.id,
-    incomingTag.updatedAt,
-    conflictingTagId,
-  );
-
-  await db.runAsync(
-    `
-      DELETE FROM sync_queue
-      WHERE entityType = 'tag' AND entityId = ?;
-    `,
-    conflictingTagId,
-  );
-
-  await db.runAsync('DELETE FROM tags WHERE id = ?;', conflictingTagId);
-};
-
 const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
   const db = await getDatabase();
   const localState = await loadLocalEntriesState();
@@ -340,56 +209,73 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
   await db.execAsync('BEGIN IMMEDIATE TRANSACTION;');
 
   try {
-    const incomingTagGroups = normalizeTagGroupNames([
-      ...entries.tagGroups,
-      ...entries.tags.map((tag) => tag.groupName),
-    ]);
-
-    if (incomingTagGroups.length > 0) {
-      const mergedTagGroups = normalizeTagGroupNames([
-        ...localState.tagGroups,
-        ...incomingTagGroups,
-      ]);
-
-      await db.runAsync(
-        "DELETE FROM sync_queue WHERE entityType = 'tagGroups' AND entityId = ? AND status != 'synced';",
-        TAG_GROUPS_ENTITY_ID,
+    for (const group of entries.tagGroups) {
+      const localGroup = await db.getFirstAsync<{ updatedAt: string }>(
+        'SELECT updatedAt FROM tag_groups WHERE id = ?;',
+        group.id,
       );
+      const selected = mergeByUpdatedAt(
+        localGroup
+          ? { id: group.id, updatedAt: localGroup.updatedAt, isDeleted: false, deletedAt: null }
+          : undefined,
+        group,
+      );
+      if (selected !== group) {
+        continue;
+      }
       await db.runAsync(
-        `
-          INSERT INTO app_settings (key, value, updatedAt)
-          VALUES (?, ?, ?)
-          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt;
-        `,
-        TAG_GROUPS_SETTING_KEY,
-        JSON.stringify(mergedTagGroups),
-        toLocalIsoString(),
+        `INSERT INTO tag_groups (id, name, createdAt, updatedAt, isDeleted, deletedAt)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           createdAt = excluded.createdAt,
+           updatedAt = excluded.updatedAt,
+           isDeleted = excluded.isDeleted,
+           deletedAt = excluded.deletedAt;`,
+        group.id,
+        group.name,
+        group.createdAt,
+        group.updatedAt,
+        group.isDeleted ? 1 : 0,
+        group.deletedAt,
       );
     }
 
     for (const tag of entries.tags) {
-      await adoptTagNameConflict(db, tag);
-      await db.runAsync(
-        "DELETE FROM sync_queue WHERE entityType = 'tag' AND entityId = ? AND status != 'synced';",
+      const localTag = await db.getFirstAsync<{ updatedAt: string }>(
+        'SELECT updatedAt FROM tags WHERE id = ?;',
         tag.id,
       );
+      const selected = mergeByUpdatedAt(
+        localTag
+          ? { id: tag.id, updatedAt: localTag.updatedAt, isDeleted: false, deletedAt: null }
+          : undefined,
+        tag,
+      );
+      if (selected !== tag) {
+        continue;
+      }
       await db.runAsync(
         `
-          INSERT INTO tags (id, name, color, groupName, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO tags (id, name, color, groupId, createdAt, updatedAt, isDeleted, deletedAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             color = excluded.color,
-            groupName = excluded.groupName,
+            groupId = excluded.groupId,
             createdAt = excluded.createdAt,
-            updatedAt = excluded.updatedAt;
+            updatedAt = excluded.updatedAt,
+            isDeleted = excluded.isDeleted,
+            deletedAt = excluded.deletedAt;
         `,
         tag.id,
         tag.name,
         tag.color,
-        normalizeCustomTagGroupName(tag.groupName),
+        tag.groupId,
         tag.createdAt,
         tag.updatedAt,
+        tag.isDeleted ? 1 : 0,
+        tag.deletedAt,
       );
     }
 
@@ -399,16 +285,25 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
         task.recurrenceDays,
       );
 
-      await db.runAsync(
-        "DELETE FROM sync_queue WHERE entityType = 'task' AND entityId = ? AND status != 'synced';",
+      const localTask = await db.getFirstAsync<{ updatedAt: string }>(
+        'SELECT updatedAt FROM tasks WHERE id = ?;',
         task.id,
       );
+      const selected = mergeByUpdatedAt(
+        localTask
+          ? { id: task.id, updatedAt: localTask.updatedAt, isDeleted: false, deletedAt: null }
+          : undefined,
+        task,
+      );
+      if (selected !== task) {
+        continue;
+      }
       await db.runAsync(
         `
           INSERT INTO tasks (
-            id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
+            id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt, isDeleted, deletedAt
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             date = excluded.date,
@@ -422,7 +317,9 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
             recurrenceType = excluded.recurrenceType,
             recurrenceDays = excluded.recurrenceDays,
             createdAt = excluded.createdAt,
-            updatedAt = excluded.updatedAt;
+            updatedAt = excluded.updatedAt,
+            isDeleted = excluded.isDeleted,
+            deletedAt = excluded.deletedAt;
         `,
         task.id,
         task.title,
@@ -434,6 +331,8 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
         JSON.stringify(normalizedRecurrence.recurrenceDays),
         task.createdAt,
         task.updatedAt,
+        task.isDeleted ? 1 : 0,
+        task.deletedAt,
       );
     }
 
@@ -442,16 +341,25 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
       const safeTagId = availableTagIds.has(session.tagId) ? session.tagId : GENERAL_TAG_ID;
       const createdAt = session.endTime.includes('T') ? session.endTime : toLocalIsoString();
 
-      await db.runAsync(
-        "DELETE FROM sync_queue WHERE entityType = 'session' AND entityId = ? AND status != 'synced';",
+      const localSession = await db.getFirstAsync<{ updatedAt: string }>(
+        'SELECT updatedAt FROM sessions WHERE id = ?;',
         session.id,
       );
+      const selected = mergeByUpdatedAt(
+        localSession
+          ? { id: session.id, updatedAt: localSession.updatedAt, isDeleted: false, deletedAt: null }
+          : undefined,
+        session,
+      );
+      if (selected !== session) {
+        continue;
+      }
       await db.runAsync(
         `
           INSERT INTO sessions (
-            id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt
+            id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt, updatedAt, isDeleted, deletedAt
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             title = excluded.title,
             date = excluded.date,
@@ -461,7 +369,10 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
             taskId = excluded.taskId,
             tagId = excluded.tagId,
             syncStatus = excluded.syncStatus,
-            createdAt = excluded.createdAt;
+            createdAt = excluded.createdAt,
+            updatedAt = excluded.updatedAt,
+            isDeleted = excluded.isDeleted,
+            deletedAt = excluded.deletedAt;
         `,
         session.id,
         session.title,
@@ -472,7 +383,10 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
         safeTaskId,
         safeTagId,
         'synced',
-        createdAt,
+        session.createdAt,
+        session.updatedAt,
+        session.isDeleted ? 1 : 0,
+        session.deletedAt,
       );
     }
 
@@ -489,21 +403,23 @@ const buildPendingDownsyncEntries = (
 ): DownsyncPreviewEntry[] => {
   const remoteTagsById = new Map(entries.tags.map((tag) => [tag.id, tag]));
   const remoteTasksById = new Map(entries.tasks.map((task) => [task.id, task]));
-  const remoteTagGroupNames = normalizeTagGroupNames(entries.tags.map((tag) => tag.groupName));
   const pendingEntries: DownsyncPreviewEntry[] = [];
 
-  for (const groupName of entries.tagGroups) {
+  for (const group of entries.tagGroups) {
+    const groupName = group.name;
     if (
       hasTagGroupName(localState.tagGroups, groupName) ||
-      hasTagGroupName(remoteTagGroupNames, groupName)
+      entries.tagGroups.some(
+        (entry) => entry.name.localeCompare(groupName, 'de-DE', { sensitivity: 'base' }) === 0,
+      )
     ) {
       continue;
     }
 
     pendingEntries.push({
       id: `tagGroups:${groupName}`,
-      entityType: 'tagGroups',
-      entityId: groupName,
+      entityType: 'tagGroup',
+      entityId: group.id,
       title: groupName,
       subtitle: 'Gruppe · Neu',
       detail: 'Leere Tag-Gruppe',
@@ -523,7 +439,7 @@ const buildPendingDownsyncEntries = (
       entityId: tag.id,
       title: tag.name,
       subtitle: `Tag · ${buildStatusLabel(Boolean(localTag))}`,
-      detail: `Gruppe ${getTagGroupLabel(tag.groupName)} - Farbe ${tag.color}`,
+      detail: `Gruppe ${tag.groupId ?? 'Allgemein'} - Farbe ${tag.color}`,
       statusLabel: buildStatusLabel(Boolean(localTag)),
     });
   }
@@ -611,15 +527,14 @@ const buildImportSubset = async (
   const includedTagGroups = new Set<string>();
   const includedTasks = new Set<string>();
 
-  const ensureTagGroup = (groupName?: string | null): void => {
-    const normalizedGroupName = normalizeCustomTagGroupName(groupName);
-
-    if (!normalizedGroupName || includedTagGroups.has(normalizedGroupName.toLocaleLowerCase('de-DE'))) {
+  const ensureTagGroup = (groupId?: string | null): void => {
+    const remoteGroup = groupId ? entries.tagGroups.find((group) => group.id === groupId) : undefined;
+    if (!remoteGroup || includedTagGroups.has(remoteGroup.id)) {
       return;
     }
 
-    subset.tagGroups.push(normalizedGroupName);
-    includedTagGroups.add(normalizedGroupName.toLocaleLowerCase('de-DE'));
+    subset.tagGroups.push(remoteGroup);
+    includedTagGroups.add(remoteGroup.id);
   };
 
   const ensureTag = (tagId: string): string => {
@@ -632,7 +547,7 @@ const buildImportSubset = async (
       if (!includedTags.has(remoteTag.id)) {
         subset.tags.push(remoteTag);
         includedTags.add(remoteTag.id);
-        ensureTagGroup(remoteTag.groupName);
+        ensureTagGroup(remoteTag.groupId);
       }
 
       return remoteTag.id;
@@ -672,17 +587,14 @@ const buildImportSubset = async (
     return subset;
   }
 
-  if (entityType === 'tagGroups') {
-    const remoteGroupName = entries.tagGroups.find(
-      (groupName) =>
-        groupName.localeCompare(entityId, 'de-DE', { sensitivity: 'base' }) === 0,
-    );
+  if (entityType === 'tagGroup') {
+    const remoteGroup = entries.tagGroups.find((group) => group.id === entityId);
 
-    if (!remoteGroupName) {
+    if (!remoteGroup) {
       throw new Error('Die ausgewählte Gruppe wurde nicht mehr gefunden.');
     }
 
-    ensureTagGroup(remoteGroupName);
+    ensureTagGroup(remoteGroup.name);
     return subset;
   }
 
@@ -729,15 +641,7 @@ export const applyPendingDownsyncEntry = async (
 };
 
 export const downsyncEntries = async (): Promise<void> => {
-  if (Platform.OS !== 'web') {
-    return;
-  }
-
+  await syncManager.flushQueue();
   const entries = await fetchNormalizedEntries();
   await applyEntries(entries);
-};
-
-export const downsyncOpenTasks = async (): Promise<void> => {
-  const entries = await fetchNormalizedEntries();
-  await applyEntries(buildOpenTaskEntries(entries));
 };

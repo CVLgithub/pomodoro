@@ -8,7 +8,6 @@ import {
 import { toLocalIsoString } from '../../utils/date';
 import { createUuid } from '../../utils/uuid';
 import { getDatabase } from '../client';
-import { deleteSyncQueueItemsByEntity } from './syncQueueRepository';
 
 type SessionRow = {
   id: string;
@@ -21,6 +20,9 @@ type SessionRow = {
   tagId: string;
   syncStatus: SessionSyncStatus;
   createdAt: string;
+  updatedAt: string;
+  isDeleted: number;
+  deletedAt: string | null;
 };
 
 const mapSessionRow = (row: SessionRow): Session => ({
@@ -34,14 +36,18 @@ const mapSessionRow = (row: SessionRow): Session => ({
   tagId: row.tagId,
   syncStatus: row.syncStatus,
   createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+  isDeleted: Boolean(row.isDeleted),
+  deletedAt: row.deletedAt,
 });
 
 export const listSessions = async (): Promise<Session[]> => {
   const db = await getDatabase();
   const rows = await db.getAllAsync<SessionRow>(
     `
-      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt
+      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt, updatedAt, isDeleted, deletedAt
       FROM sessions
+      WHERE isDeleted = 0
       ORDER BY date DESC, startTime DESC;
     `,
   );
@@ -53,9 +59,9 @@ export const getSessionById = async (id: string): Promise<Session | null> => {
   const db = await getDatabase();
   const row = await db.getFirstAsync<SessionRow>(
     `
-      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt
+      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt, updatedAt, isDeleted, deletedAt
       FROM sessions
-      WHERE id = ?;
+      WHERE id = ? AND isDeleted = 0;
     `,
     id,
   );
@@ -67,8 +73,9 @@ export const getLatestSession = async (): Promise<Session | null> => {
   const db = await getDatabase();
   const row = await db.getFirstAsync<SessionRow>(
     `
-      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt
+      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt, updatedAt, isDeleted, deletedAt
       FROM sessions
+      WHERE isDeleted = 0
       ORDER BY startTime DESC
       LIMIT 1;
     `,
@@ -79,6 +86,7 @@ export const getLatestSession = async (): Promise<Session | null> => {
 
 export const createSession = async (input: CreateSessionInput): Promise<Session> => {
   const db = await getDatabase();
+  const now = toLocalIsoString();
   const session: Session = {
     id: createUuid(),
     title: input.title,
@@ -89,15 +97,18 @@ export const createSession = async (input: CreateSessionInput): Promise<Session>
     taskId: input.taskId ?? null,
     tagId: input.tagId,
     syncStatus: input.syncStatus ?? 'pending',
-    createdAt: toLocalIsoString(),
+    createdAt: now,
+    updatedAt: now,
+    isDeleted: false,
+    deletedAt: null,
   };
 
   await db.runAsync(
     `
       INSERT INTO sessions (
-        id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt
+        id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt, updatedAt, isDeleted, deletedAt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL);
     `,
     session.id,
     session.title,
@@ -109,6 +120,7 @@ export const createSession = async (input: CreateSessionInput): Promise<Session>
     session.tagId,
     session.syncStatus,
     session.createdAt,
+    session.updatedAt,
   );
 
   return session;
@@ -117,8 +129,14 @@ export const createSession = async (input: CreateSessionInput): Promise<Session>
 export const deleteSession = async (id: string): Promise<void> => {
   const db = await getDatabase();
 
-  await db.runAsync('DELETE FROM sessions WHERE id = ?;', id);
-  await deleteSyncQueueItemsByEntity('session', id);
+  const now = toLocalIsoString();
+  await db.runAsync(
+    'UPDATE sessions SET isDeleted = 1, deletedAt = ?, updatedAt = ?, syncStatus = ? WHERE id = ?;',
+    now,
+    now,
+    'pending',
+    id,
+  );
 };
 
 export const updateSessionAssignment = async (
@@ -138,18 +156,20 @@ export const updateSessionAssignment = async (
     title: input.title,
     tagId: input.tagId,
     syncStatus: 'pending',
+    updatedAt: toLocalIsoString(),
   };
 
   await db.runAsync(
     `
       UPDATE sessions
-      SET taskId = ?, title = ?, tagId = ?, syncStatus = ?
+      SET taskId = ?, title = ?, tagId = ?, syncStatus = ?, updatedAt = ?
       WHERE id = ?;
     `,
     updatedSession.taskId,
     updatedSession.title,
     updatedSession.tagId,
     updatedSession.syncStatus,
+    updatedSession.updatedAt,
     updatedSession.id,
   );
 
@@ -172,21 +192,53 @@ export const updateSession = async (
     title: input.title.trim(),
     tagId: input.tagId,
     syncStatus: 'pending',
+    updatedAt: toLocalIsoString(),
   };
 
   await db.runAsync(
     `
       UPDATE sessions
-      SET title = ?, tagId = ?, syncStatus = ?
+      SET title = ?, tagId = ?, syncStatus = ?, updatedAt = ?
       WHERE id = ?;
     `,
     updatedSession.title,
     updatedSession.tagId,
     updatedSession.syncStatus,
+    updatedSession.updatedAt,
     updatedSession.id,
   );
 
   return updatedSession;
+};
+
+export const restoreSession = async (id: string): Promise<Session> => {
+  const db = await getDatabase();
+  const now = toLocalIsoString();
+  await db.runAsync(
+    'UPDATE sessions SET isDeleted = 0, deletedAt = NULL, updatedAt = ?, syncStatus = ? WHERE id = ?;',
+    now,
+    'pending',
+    id,
+  );
+  const restored = await getSessionById(id);
+  if (!restored) {
+    throw new Error('Session not found');
+  }
+  return restored;
+};
+
+export const listDeletedSessions = async (): Promise<Session[]> => {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<SessionRow>(
+    `
+      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus,
+             createdAt, updatedAt, isDeleted, deletedAt
+      FROM sessions
+      WHERE isDeleted = 1
+      ORDER BY deletedAt DESC;
+    `,
+  );
+  return rows.map(mapSessionRow);
 };
 
 export const updateSessionSyncStatus = async (

@@ -11,6 +11,9 @@ export interface Session {
   tagId: string;
   syncStatus: SessionSyncStatus;
   createdAt: string;
+  updatedAt: string;
+  isDeleted: boolean;
+  deletedAt: string | null;
 }
 
 export interface CreateSessionInput {
@@ -33,4 +36,11 @@ export interface UpdateSessionAssignmentInput {
 export interface UpdateSessionInput {
   title: string;
   tagId: string;
+}
+
+export interface SessionDeletePayload {
+  id: string;
+  updatedAt: string;
+  deletedAt: string;
+  isDeleted: true;
 }

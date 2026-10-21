@@ -1,4 +1,6 @@
 import { Tag } from '../types/tag';
+import { TagGroup } from '../types/tagGroup';
+import { GENERAL_TAG_GROUP_ID } from '../constants/config';
 
 export const DEFAULT_TAG_GROUP_KEY = '__default__';
 export const DEFAULT_TAG_GROUP_LABEL = 'Allgemein';
@@ -41,11 +43,11 @@ export const normalizeCustomTagGroupName = (value?: string | null): string | nul
   return normalizedValue;
 };
 
-export const getTagGroupKey = (groupName?: string | null): string =>
-  normalizeCustomTagGroupName(groupName) ?? DEFAULT_TAG_GROUP_KEY;
+export const getTagGroupKey = (groupId?: string | null): string =>
+  groupId ?? GENERAL_TAG_GROUP_ID;
 
-export const getTagGroupLabel = (groupName?: string | null): string =>
-  normalizeCustomTagGroupName(groupName) ?? DEFAULT_TAG_GROUP_LABEL;
+export const getTagGroupLabel = (groupId?: string | null, groups: TagGroup[] = []): string =>
+  groups.find((group) => group.id === groupId)?.name ?? DEFAULT_TAG_GROUP_LABEL;
 
 export const compareTagGroupNames = (
   left: string | null | undefined,
@@ -87,35 +89,24 @@ export const normalizeTagGroupNames = (groupNames: (string | null | undefined)[]
   return Array.from(groupsByCompareKey.values()).sort(compareTagGroupNames);
 };
 
-export const buildTagGroupOptions = (
-  tags: Tag[],
-  savedGroupNames: string[] = [],
-): TagGroupOption[] => {
-  const customGroupNames = normalizeTagGroupNames([
-    ...savedGroupNames,
-    ...tags.map((tag) => tag.groupName),
-  ]);
-
+export const buildTagGroupOptions = (tags: Tag[], groups: TagGroup[] = []): TagGroupOption[] => {
   return [
     {
-      key: DEFAULT_TAG_GROUP_KEY,
+      key: GENERAL_TAG_GROUP_ID,
       label: DEFAULT_TAG_GROUP_LABEL,
-      value: null,
+      value: GENERAL_TAG_GROUP_ID,
     },
-    ...customGroupNames.map((groupName) => ({
-      key: getTagGroupKey(groupName),
-      label: groupName,
-      value: groupName,
+    ...groups
+      .filter((group) => group.id !== GENERAL_TAG_GROUP_ID && !group.isDeleted)
+      .map((group) => ({
+      key: group.id,
+      label: group.name,
+      value: group.id,
     })),
   ];
 };
 
 export const sortTagsByGroupAndName = (tags: Tag[]): Tag[] =>
   [...tags].sort((left, right) => {
-    const groupCompare = compareTagGroupNames(left.groupName, right.groupName);
-    if (groupCompare !== 0) {
-      return groupCompare;
-    }
-
     return left.name.localeCompare(right.name, 'de-DE', { sensitivity: 'base' });
   });

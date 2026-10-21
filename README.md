@@ -5,7 +5,7 @@
 - Expo Router fuer Navigation mit 5 Haupttabs und Detail-Screens.
 - SQLite (`expo-sqlite`) als primaere Datenquelle fuer Tasks, Tags, Sessions, Sync-Queue und Timer-State.
 - Zustand fuer modulare Stores (`tasks`, `tags`, `sessions`, `timer`, `sync`, `ui`).
-- Push-only Sync ueber `fetch`; keine Pull-/Downsync-Logik.
+- Push- und Downsync ueber `fetch`: lokale Aenderungen werden ueber die Sync-Queue an das Backend gesendet, gespeicherte Eintraege koennen ueber `/entries` zurueckgeladen werden.
 - Timer mit persistiertem State, Resume-basierter Restzeitberechnung und lokaler Session-Speicherung.
 
 ## 2. Verwendete Pakete mit Installationsbefehlen
@@ -69,8 +69,10 @@ src/
   services/
     api/
       client.ts
+      entriesService.ts
       pushService.ts
     sync/
+      downsyncService.ts
       payloads.ts
       syncManager.ts
     timer/
@@ -78,6 +80,7 @@ src/
       timerResume.ts
   store/
     sessionsStore.ts
+    settingsStore.ts
     timerStore.ts
     tasksStore.ts
     tagsStore.ts
@@ -87,6 +90,7 @@ src/
     index.ts
   types/
     api.ts
+    settings.ts
     session.ts
     sync.ts
     tag.ts
@@ -105,7 +109,8 @@ src/
 - `app/(tabs)/timer.tsx`: Timer-UI, Moduswahl, Wheel-Picker, Session-Zuordnung.
 - `src/store/timerStore.ts`: Persistenter Timer-State, Resume-Abschluss, Session-Erzeugung.
 - `src/services/timer/timerEngine.ts`: Reine Timer-Logik fuer Start/Pause/Resume/Reset/Complete.
-- `src/services/sync/syncManager.ts`: Queue-Eintrag anlegen, Push ausfuehren, Status aktualisieren.
+- `src/services/sync/syncManager.ts`: Queue-Eintrag anlegen, Push ausfuehren, Status aktualisieren und fehlgeschlagene Eintraege erneut senden.
+- `src/services/sync/downsyncService.ts`: Eintraege ueber `/entries` laden und mit der lokalen SQLite-Datenbank abgleichen.
 
 ## 5. SQLite-Schema + Migrationen
 
@@ -138,8 +143,10 @@ src/
 
 ## 9. API-Client + Push-Service + Sync-Queue
 
-- `src/services/api/client.ts` kapselt `fetch`.
-- `src/services/api/pushService.ts` mappt auf `/push/task`, `/push/tag`, `/push/session`.
+- `src/services/api/client.ts` kapselt die Backend-Anfragen per `fetch`.
+- `src/services/api/entriesService.ts` laedt den Backend-Bestand ueber `GET /entries`.
+- `src/services/api/pushService.ts` mappt auf `/push/task`, `/push/tag`, `/push/tag-groups`, `/push/session`.
+- `src/services/sync/downsyncService.ts` verarbeitet den manuellen und automatischen Downsync.
 - `src/services/sync/syncManager.ts` legt fuer jeden Push einen Queue-Eintrag an und markiert `synced` oder `failed`.
 - Delete-Operationen fuer Tags und Tasks werden als Tombstone-JSON gepusht.
 
@@ -151,6 +158,7 @@ src/
 - `tasks.tsx`: offene und erledigte Aufgaben, gruppiert nach Tags.
 - `stats.tsx`: Tagesgruppen abgeschlossener Fokus-Sessions plus Summenkarten.
 - `settings.tsx`: Backend-Hinweis, Tag-Verwaltung, Sync-Queue mit JSON-Ansicht und Retry.
+- `downsync.tsx`: Manueller Abruf und Abgleich der Eintraege vom Backend.
 
 ## 11. Startanleitung
 
@@ -164,11 +172,31 @@ Dann in Expo fuer iOS starten, z. B. mit `i`.
 Optional:
 
 ```bash
-$env:EXPO_PUBLIC_BACKEND_URL='https://dein-backend.example'
+$env:EXPO_PUBLIC_BACKEND_URL='http://localhost:8000'
 npm run start
 ```
 
-## 12. Sinnvolle naechste Schritte
+Die Standardadresse des Frontends ist aktuell `http://localhost:3000`. Fuer das mitgelieferte
+Backend auf dem Standardport muss die Backend-Adresse in den Einstellungen auf
+`http://localhost:8000` gesetzt werden. Eine gesetzte `EXPO_PUBLIC_BACKEND_URL` wird als
+Startwert verwendet.
+
+## 12. Synchronisation
+
+Lokale Aenderungen werden direkt beziehungsweise ueber die lokale Sync-Queue an das Backend
+gepusht. Unterstuetzte Push-Endpunkte sind:
+
+- `POST /push/tag`
+- `POST /push/tag-groups`
+- `POST /push/task`
+- `POST /push/session`
+
+Beim App-Start, beim Zurueckkehren in die App und ueber den Downsync-Screen kann der Bestand
+mit `GET /entries` vom Backend geladen und lokal eingepflegt werden. Der automatische Downsync
+laedt beim App-Start den gesamten Bestand und aktualisiert beim Zurueckkehren offene Tasks.
+Fehlerhafte Pushes bleiben in der Queue und koennen in den Einstellungen erneut versucht werden.
+
+## 13. Sinnvolle naechste Schritte
 
 - Tests fuer Timer-Resume, Tag-Delete-Reassignment und Sync-Queue ergaenzen.
 - Error-Handling pro Screen mit Toast oder Inline-Feedback verfeinern.

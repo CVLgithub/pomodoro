@@ -15,7 +15,6 @@ import { GENERAL_TAG_ID } from '../../src/constants/config';
 import { colors } from '../../src/constants/colors';
 import { radii, spacing } from '../../src/constants/spacing';
 import { syncManager } from '../../src/services/sync/syncManager';
-import { toTagGroupsPushPayload } from '../../src/services/sync/payloads';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useSyncStore } from '../../src/store/syncStore';
 import { useTagsStore } from '../../src/store/tagsStore';
@@ -45,7 +44,7 @@ export default function TagDetailScreen() {
   const [createMode, setCreateMode] = useState<CreateMode>('tag');
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(tagPalette[0]);
-  const [groupName, setGroupName] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,8 +53,8 @@ export default function TagDetailScreen() {
     () => buildTagGroupOptions(tags, savedTagGroups),
     [savedTagGroups, tags],
   );
-  const selectedGroupLabel = getTagGroupLabel(groupName);
-  const selectedGroupKey = getTagGroupKey(groupName);
+  const selectedGroupLabel = getTagGroupLabel(groupId, savedTagGroups);
+  const selectedGroupKey = getTagGroupKey(groupId);
   const normalizedNewGroupName = normalizeCustomTagGroupName(newGroupName);
   const newGroupAlreadyExists = normalizedNewGroupName
     ? tagGroupOptions.some(
@@ -72,7 +71,7 @@ export default function TagDetailScreen() {
       setCreateMode('tag');
       setName('');
       setColor(tagPalette[0]);
-      setGroupName(null);
+      setGroupId(null);
       setNewGroupName('');
       setShowGroupPicker(false);
       return;
@@ -82,7 +81,7 @@ export default function TagDetailScreen() {
       setCreateMode('tag');
       setName(tag.name);
       setColor(tag.color);
-      setGroupName(tag.groupName);
+      setGroupId(tag.groupId);
       setNewGroupName('');
       setShowGroupPicker(false);
     }
@@ -96,10 +95,6 @@ export default function TagDetailScreen() {
     setIsSaving(true);
     try {
       await createTagGroup(normalizedNewGroupName);
-      await syncManager
-        .pushTagGroups(toTagGroupsPushPayload(useSettingsStore.getState().tagGroups))
-        .catch(() => undefined);
-      await useSyncStore.getState().loadQueue();
       router.back();
     } catch (error) {
       Alert.alert(
@@ -124,9 +119,9 @@ export default function TagDetailScreen() {
     setIsSaving(true);
     try {
       if (isNew) {
-        await createTag({ name, color, groupName });
+        await createTag({ name, color, groupId });
       } else if (tag) {
-        await updateTag(tag.id, { name, color, groupName });
+        await updateTag(tag.id, { name, color, groupId });
       }
       router.back();
     } catch (error) {
@@ -316,7 +311,7 @@ export default function TagDetailScreen() {
               <Pressable
                 key={option.key}
                 onPress={() => {
-                  setGroupName(option.value);
+                  setGroupId(option.value);
                   setShowGroupPicker(false);
                 }}
                 style={styles.modalRow}

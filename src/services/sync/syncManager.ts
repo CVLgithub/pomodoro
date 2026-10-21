@@ -10,24 +10,24 @@ import {
 import { updateSessionSyncStatus } from '../../db/repositories/sessionsRepository';
 import {
   PushSessionPayload,
-  PushTagGroupsPayload,
   PushTagPayload,
+  PushTagGroupPayload,
   PushTaskPayload,
 } from '../../types/api';
 import { SyncEntityType, SyncQueueItem } from '../../types/sync';
-import { normalizeTagGroupNames } from '../../utils/tagGroups';
 import {
   pushSessionPayload,
-  pushTagGroupsPayload,
   pushTagPayload,
+  pushTagGroupPayload,
   pushTaskPayload,
 } from '../api/pushService';
+import { ApiRequestError } from '../api/client';
+import { isQueueItemBlockedByEarlier, orderQueueFifo } from './syncPrimitives';
 
-const TAG_GROUPS_ENTITY_ID = 'tagGroups';
 type SyncPayload =
   | PushTaskPayload
   | PushTagPayload
-  | PushTagGroupsPayload
+  | PushTagGroupPayload
   | PushSessionPayload;
 
 const syncHandlers: Record<
@@ -36,7 +36,7 @@ const syncHandlers: Record<
 > = {
   task: async (payload) => pushTaskPayload(payload as PushTaskPayload),
   tag: async (payload) => pushTagPayload(payload as PushTagPayload),
-  tagGroups: async (payload) => pushTagGroupsPayload(payload as PushTagGroupsPayload),
+  tagGroup: async (payload) => pushTagGroupPayload(payload as PushTagGroupPayload),
   session: async (payload) => pushSessionPayload(payload as PushSessionPayload),
 };
 
@@ -47,7 +47,7 @@ const normalizeSyncPayload = (
   if (entityType === 'task') {
     const taskPayload = payload as PushTaskPayload;
 
-    if ('isDeleted' in taskPayload) {
+    if (!('title' in taskPayload)) {
       return taskPayload;
     }
 
@@ -59,13 +59,21 @@ const normalizeSyncPayload = (
       isCompleted: taskPayload.isCompleted,
       recurrenceType: taskPayload.recurrenceType,
       recurrenceDays: taskPayload.recurrenceDays,
+      createdAt: taskPayload.createdAt,
+      updatedAt: taskPayload.updatedAt,
+      isDeleted: taskPayload.isDeleted,
+      deletedAt: taskPayload.deletedAt,
     };
+  }
+
+  if (entityType === 'tagGroup') {
+    return payload as PushTagGroupPayload;
   }
 
   if (entityType === 'tag') {
     const tagPayload = payload as PushTagPayload;
 
-    if ('isDeleted' in tagPayload) {
+    if (!('name' in tagPayload)) {
       return tagPayload;
     }
 
@@ -73,15 +81,11 @@ const normalizeSyncPayload = (
       id: tagPayload.id,
       name: tagPayload.name,
       color: tagPayload.color,
-      groupName: tagPayload.groupName,
-    };
-  }
-
-  if (entityType === 'tagGroups') {
-    const tagGroupsPayload = payload as PushTagGroupsPayload;
-
-    return {
-      tagGroups: normalizeTagGroupNames(tagGroupsPayload.tagGroups),
+      groupId: tagPayload.groupId,
+      createdAt: tagPayload.createdAt,
+      updatedAt: tagPayload.updatedAt,
+      isDeleted: tagPayload.isDeleted,
+      deletedAt: tagPayload.deletedAt,
     };
   }
 
@@ -96,6 +100,10 @@ const normalizeSyncPayload = (
     durationMinutes: sessionPayload.durationMinutes,
     taskId: sessionPayload.taskId,
     tagId: sessionPayload.tagId,
+    createdAt: sessionPayload.createdAt,
+    updatedAt: sessionPayload.updatedAt,
+    isDeleted: sessionPayload.isDeleted,
+    deletedAt: sessionPayload.deletedAt,
   };
 };
 
@@ -126,8 +134,10 @@ const performSyncRequest = async (
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown sync error';
-    await updateSyncQueueItemStatus(item.id, 'failed', {
-      errorMessage: message,
+    const isMissingUserId = message.startsWith('Keine userId konfiguriert.');
+    const isClientError = error instanceof ApiRequestError && error.status >= 400 && error.status < 500;
+    await updateSyncQueueItemStatus(item.id, isMissingUserId ? 'pending' : isClientError ? 'failed' : 'pending', {
+      errorMessage: isMissingUserId ? null : message,
       retryCount,
     });
 
@@ -146,6 +156,16 @@ const enqueueAndPush = async (
   payload: SyncPayload,
 ): Promise<void> => {
   const normalizedPayload = normalizeSyncPayload(entityType, payload);
+  const existing = await getLatestSyncQueueItemForEntity(entityType, entityId);
+  if (existing) {
+    const existingPayload = JSON.parse(existing.payloadJson) as { updatedAt?: string; isDeleted?: boolean };
+    if (
+      existingPayload.updatedAt &&
+      normalizedPayload.updatedAt < existingPayload.updatedAt
+    ) {
+      return;
+    }
+  }
   await deleteUnsyncedSyncQueueItemsByEntity(entityType, entityId);
   const queueItem = await createSyncQueueItem({
     entityType,
@@ -164,8 +184,8 @@ export const syncManager = {
   pushTag: async (entityId: string, payload: PushTagPayload): Promise<void> => {
     await enqueueAndPush('tag', entityId, '/push/tag', payload);
   },
-  pushTagGroups: async (payload: PushTagGroupsPayload): Promise<void> => {
-    await enqueueAndPush('tagGroups', TAG_GROUPS_ENTITY_ID, '/push/tag-groups', payload);
+  pushTagGroup: async (payload: PushTagGroupPayload): Promise<void> => {
+    await enqueueAndPush('tagGroup', payload.id, '/push/tag-group', payload);
   },
   pushSession: async (payload: PushSessionPayload): Promise<void> => {
     await enqueueAndPush('session', payload.id, '/push/session', payload);
@@ -185,28 +205,43 @@ export const syncManager = {
     const payload = JSON.parse(item.payloadJson) as
       | PushTaskPayload
       | PushTagPayload
-      | PushTagGroupsPayload
+      | PushTagGroupPayload
       | PushSessionPayload;
 
     await performSyncRequest(item, payload, item.retryCount + 1);
   },
   retryAllFailed: async (): Promise<void> => {
-    const items = await listSyncQueueItems();
-    const retryableItems = items
-      .filter((item) => item.status !== 'synced')
-      .sort((left, right) => {
-        if (left.createdAt !== right.createdAt) {
-          return left.createdAt.localeCompare(right.createdAt);
-        }
+    const items = orderQueueFifo(
+      (await listSyncQueueItems()).filter((item) => item.status === 'failed'),
+    );
 
-        return left.updatedAt.localeCompare(right.updatedAt);
-      });
-
-    for (const item of retryableItems) {
+    for (const [index, item] of items.entries()) {
+      if (isQueueItemBlockedByEarlier(item, items.slice(index))) {
+        continue;
+      }
       try {
         await syncManager.retryQueueItem(item.id);
-      } catch {
-        // Queue items remain visible for manual inspection.
+      } catch (error) {
+        if (!(error instanceof ApiRequestError && error.status >= 400 && error.status < 500)) {
+          break;
+        }
+      }
+    }
+  },
+  flushQueue: async (): Promise<void> => {
+    const items = orderQueueFifo(
+      (await listSyncQueueItems()).filter((item) => item.status === 'pending'),
+    );
+    for (const [index, item] of items.entries()) {
+      if (isQueueItemBlockedByEarlier(item, items.slice(index))) {
+        continue;
+      }
+      try {
+        await syncManager.retryQueueItem(item.id);
+      } catch (error) {
+        if (!(error instanceof ApiRequestError && error.status >= 400 && error.status < 500)) {
+          break;
+        }
       }
     }
   },

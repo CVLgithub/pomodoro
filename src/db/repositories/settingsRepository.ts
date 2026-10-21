@@ -18,6 +18,9 @@ const DAILY_FOCUS_GOAL_NOTIFIED_DATE_KEY = 'dailyFocusGoalNotifiedDate';
 const AUTO_SWITCH_TO_BREAKS_KEY = 'autoSwitchToBreaks';
 const TAG_GROUPS_KEY = 'tagGroups';
 const START_PAGE_KEY = 'startPage';
+const USER_ID_KEY = 'userId';
+const LAST_SYNC_SUCCESS_KEY = 'lastSyncSuccess';
+const LAST_SYNC_ERROR_KEY = 'lastSyncError';
 
 const parseTagGroupsSetting = (value?: string): string[] => {
   if (!value) {
@@ -47,6 +50,85 @@ export const getBackendUrlSetting = async (): Promise<string> => {
   );
 
   return row?.value?.trim() || DEFAULT_BACKEND_URL;
+};
+
+export const getUserIdSetting = async (): Promise<string | null> => {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<SettingRow>(
+    'SELECT value FROM app_settings WHERE key = ?;',
+    USER_ID_KEY,
+  );
+  const persistedValue = row?.value?.trim();
+  if (persistedValue) {
+    return persistedValue;
+  }
+
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    return process.env.EXPO_PUBLIC_DEV_USER_ID?.trim() || null;
+  }
+
+  return null;
+};
+
+export const isDevUserIdSetting = async (): Promise<boolean> => {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<SettingRow>(
+    'SELECT value FROM app_settings WHERE key = ?;',
+    USER_ID_KEY,
+  );
+  return !row?.value?.trim() && typeof __DEV__ !== 'undefined' && __DEV__ &&
+    Boolean(process.env.EXPO_PUBLIC_DEV_USER_ID?.trim());
+};
+
+export const saveUserIdSetting = async (userId: string): Promise<string> => {
+  const db = await getDatabase();
+  const normalizedValue = userId.trim();
+  await db.runAsync(
+    `INSERT INTO app_settings (key, value, updatedAt)
+     VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt;`,
+    USER_ID_KEY,
+    normalizedValue,
+    toLocalIsoString(),
+  );
+  return normalizedValue;
+};
+
+export const getLastSyncStatus = async (): Promise<{
+  successfulAt: string | null;
+  error: string | null;
+}> => {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    'SELECT key, value FROM app_settings WHERE key IN (?, ?);',
+    LAST_SYNC_SUCCESS_KEY,
+    LAST_SYNC_ERROR_KEY,
+  );
+  const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+  return {
+    successfulAt: values[LAST_SYNC_SUCCESS_KEY] ?? null,
+    error: values[LAST_SYNC_ERROR_KEY] ?? null,
+  };
+};
+
+const saveSetting = async (key: string, value: string): Promise<void> => {
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT INTO app_settings (key, value, updatedAt) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt;`,
+    key,
+    value,
+    toLocalIsoString(),
+  );
+};
+
+export const saveLastSyncSuccess = async (value: string): Promise<void> => {
+  await saveSetting(LAST_SYNC_SUCCESS_KEY, value);
+  await saveSetting(LAST_SYNC_ERROR_KEY, '');
+};
+
+export const saveLastSyncError = async (value: string): Promise<void> => {
+  await saveSetting(LAST_SYNC_ERROR_KEY, value);
 };
 
 export const saveBackendUrlSetting = async (value: string): Promise<string> => {

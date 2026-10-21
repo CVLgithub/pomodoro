@@ -9,6 +9,7 @@ import { Screen } from '../../src/components/ui/Screen';
 import { colors } from '../../src/constants/colors';
 import { radii, spacing } from '../../src/constants/spacing';
 import { useTagsStore } from '../../src/store/tagsStore';
+import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
 import { useUiStore } from '../../src/store/uiStore';
 import { Tag } from '../../src/types/tag';
@@ -35,6 +36,7 @@ type TasksByTagGroup = {
 const buildTasksByTagGroups = (
   tags: Tag[],
   tasks: Task[],
+  tagGroups: Parameters<typeof getTagGroupLabel>[1],
 ): TasksByTagGroup[] => {
   const sortedTags = sortTagsByGroupAndName(tags);
   const tasksByTagId = new Map<string, Task[]>();
@@ -53,8 +55,8 @@ const buildTasksByTagGroups = (
       continue;
     }
 
-    const groupKey = getTagGroupKey(tag.groupName);
-    const groupLabel = getTagGroupLabel(tag.groupName);
+    const groupKey = getTagGroupKey(tag.groupId);
+    const groupLabel = getTagGroupLabel(tag.groupId, tagGroups);
     const existingGroup = groups.find((entry) => entry.groupKey === groupKey);
 
     if (existingGroup) {
@@ -79,6 +81,7 @@ export default function TasksScreen() {
   const tasks = useTasksStore((state) => state.tasks);
   const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion);
   const tags = useTagsStore((state) => state.tags);
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
   const collapsedTaskTagGroups = useUiStore((state) => state.collapsedTaskTagGroups);
   const toggleTaskTagGroupCollapsed = useUiStore(
     (state) => state.toggleTaskTagGroupCollapsed,
@@ -94,8 +97,9 @@ export default function TasksScreen() {
       buildTasksByTagGroups(
         tags,
         tasks.filter((task) => !task.isCompleted),
+        tagGroups,
       ),
-    [tags, tasks],
+    [tags, tasks, tagGroups],
   );
 
   const completedTagGroups = useMemo(
@@ -103,8 +107,9 @@ export default function TasksScreen() {
       buildTasksByTagGroups(
         tags,
         tasks.filter((task) => task.isCompleted && !isTaskRecurring(task)),
+        tagGroups,
       ),
-    [tags, tasks],
+    [tags, tasks, tagGroups],
   );
 
   const renderTagGroups = (

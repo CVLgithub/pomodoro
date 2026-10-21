@@ -11,9 +11,10 @@ import { colors } from '../src/constants/colors';
 import { radii, spacing } from '../src/constants/spacing';
 import { useSessionsStore } from '../src/store/sessionsStore';
 import { useTagsStore } from '../src/store/tagsStore';
+import { useSettingsStore } from '../src/store/settingsStore';
 import { getMonthStart, getWeekStart, formatDateKey } from '../src/utils/date';
 import { formatMinutesShort } from '../src/utils/duration';
-import { compareTagGroupNames, getTagGroupKey, getTagGroupLabel } from '../src/utils/tagGroups';
+import { getTagGroupKey, getTagGroupLabel } from '../src/utils/tagGroups';
 
 type ChartRange = 'week' | 'month';
 
@@ -34,7 +35,7 @@ type TagStat = {
   tagId: string;
   label: string;
   color: string;
-  groupName: string | null;
+  groupId: string | null;
   groupLabel: string;
   totalMinutes: number;
   activeDays: number;
@@ -126,6 +127,7 @@ export default function StatsChartScreen() {
   const router = useRouter();
   const sessions = useSessionsStore((state) => state.sessions);
   const tags = useTagsStore((state) => state.tags);
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
   const [range, setRange] = useState<ChartRange>('week');
   const [monthAnchor, setMonthAnchor] = useState(() => getMonthStart(new Date()));
   const [showAllTimeTagDetails, setShowAllTimeTagDetails] = useState(false);
@@ -189,14 +191,14 @@ export default function StatsChartScreen() {
     const tagStats: TagStat[] = Array.from(totalsByTagInRange.entries())
       .map(([tagId, entry]) => {
         const tag = tagById[tagId];
-        const groupName = tag?.groupName ?? null;
+        const groupId = tag?.groupId ?? null;
 
         return {
           tagId,
           label: tag?.name ?? 'Unbekannt',
           color: tag?.color ?? FALLBACK_TAG_COLOR,
-          groupName,
-          groupLabel: getTagGroupLabel(groupName),
+          groupId,
+          groupLabel: getTagGroupLabel(groupId, tagGroups),
           totalMinutes: entry.minutes,
           activeDays: entry.activeDates.size,
         };
@@ -257,9 +259,9 @@ export default function StatsChartScreen() {
       entry.activeDates.add(session.date);
       totalsByTag.set(session.tagId, entry);
 
-      const groupKey = getTagGroupKey(tag?.groupName);
+      const groupKey = getTagGroupKey(tag?.groupId);
       const groupEntry = totalsByGroup.get(groupKey) ?? {
-        label: getTagGroupLabel(tag?.groupName),
+        label: getTagGroupLabel(tag?.groupId, tagGroups),
         minutes: 0,
         activeDates: new Set<string>(),
         tagIds: new Set<string>(),
@@ -279,20 +281,20 @@ export default function StatsChartScreen() {
     const tagStats: TagStat[] = Array.from(totalsByTag.entries())
       .map(([tagId, entry]) => {
         const tag = tagById[tagId];
-        const groupName = tag?.groupName ?? null;
+        const groupId = tag?.groupId ?? null;
 
         return {
           tagId,
           label: tag?.name ?? 'Unbekannt',
           color: tag?.color ?? FALLBACK_TAG_COLOR,
-          groupName,
-          groupLabel: getTagGroupLabel(groupName),
+          groupId,
+          groupLabel: getTagGroupLabel(groupId, tagGroups),
           totalMinutes: entry.minutes,
           activeDays: entry.activeDates.size,
         };
       })
       .sort((left, right) => {
-        const groupCompare = compareTagGroupNames(left.groupName, right.groupName);
+        const groupCompare = (left.groupId ?? '').localeCompare(right.groupId ?? '');
 
         if (groupCompare !== 0) {
           return groupCompare;

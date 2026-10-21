@@ -33,7 +33,7 @@ const ENTRY_GROUPS: Array<{
     subtitle: 'Neue oder geänderte Sessions.',
   },
   {
-    entityType: 'tagGroups',
+    entityType: 'tagGroup',
     title: 'Gruppen',
     subtitle: 'Leere oder neu gespeicherte Tag-Gruppen.',
   },
@@ -51,7 +51,7 @@ const ENTRY_GROUPS: Array<{
 
 const ENTITY_LABELS: Record<DownsyncEntityType, string> = {
   tag: 'Tag',
-  tagGroups: 'Gruppe',
+  tagGroup: 'Gruppe',
   task: 'Aufgabe',
   session: 'Session',
 };
