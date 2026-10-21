@@ -22,6 +22,7 @@ import {
   getWeekStart,
   isDateWithinRange,
 } from '../../src/utils/date';
+import { confirmAction } from '../../src/utils/confirm';
 import { formatMinutesShort } from '../../src/utils/duration';
 
 export default function StatsScreen() {
@@ -78,17 +79,16 @@ export default function StatsScreen() {
     setIsSaving(false);
   };
 
-  const handleDeleteSession = (sessionId: string) => {
-    void deleteSessionEntry(sessionId)
-      .then(() => {
-        closeSessionEditor();
-      })
-      .catch((error) => {
-        Alert.alert(
-          'Session konnte nicht gelöscht werden',
-          error instanceof Error ? error.message : 'Unbekannter Fehler',
-        );
-      });
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      await deleteSessionEntry(sessionId);
+      closeSessionEditor();
+    } catch (error) {
+      Alert.alert(
+        'Session konnte nicht gelöscht werden',
+        error instanceof Error ? error.message : 'Unbekannter Fehler',
+      );
+    }
   };
 
   const handleSaveSession = async () => {
@@ -200,18 +200,16 @@ export default function StatsScreen() {
                   return;
                 }
 
-                Alert.alert(
-                  'Session löschen?',
-                  `${selectedSession.title} wird aus der lokalen Statistik entfernt.`,
-                  [
-                    { text: 'Abbrechen', style: 'cancel' },
-                    {
-                      text: 'Löschen',
-                      style: 'destructive',
-                      onPress: () => handleDeleteSession(selectedSession.id),
-                    },
-                  ],
-                );
+                const sessionToDelete = selectedSession;
+                void confirmAction({
+                  title: 'Session löschen?',
+                  message: `${sessionToDelete.title} wird aus der lokalen Statistik entfernt.`,
+                  confirmLabel: 'Löschen',
+                }).then((confirmed) => {
+                  if (confirmed) {
+                    void handleDeleteSession(sessionToDelete.id);
+                  }
+                });
               }}
             />
           </View>

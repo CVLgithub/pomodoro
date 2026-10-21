@@ -55,6 +55,19 @@ export const listSessions = async (): Promise<Session[]> => {
   return rows.map(mapSessionRow);
 };
 
+export const listAllSessions = async (): Promise<Session[]> => {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<SessionRow>(
+    `
+      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus, createdAt, updatedAt, isDeleted, deletedAt
+      FROM sessions
+      ORDER BY date DESC, startTime DESC;
+    `,
+  );
+
+  return rows.map(mapSessionRow);
+};
+
 export const getSessionById = async (id: string): Promise<Session | null> => {
   const db = await getDatabase();
   const row = await db.getFirstAsync<SessionRow>(
@@ -126,7 +139,7 @@ export const createSession = async (input: CreateSessionInput): Promise<Session>
   return session;
 };
 
-export const deleteSession = async (id: string): Promise<void> => {
+export const deleteSession = async (id: string): Promise<Session> => {
   const db = await getDatabase();
 
   const now = toLocalIsoString();
@@ -137,6 +150,22 @@ export const deleteSession = async (id: string): Promise<void> => {
     'pending',
     id,
   );
+
+  const row = await db.getFirstAsync<SessionRow>(
+    `
+      SELECT id, title, date, startTime, endTime, durationMinutes, taskId, tagId, syncStatus,
+             createdAt, updatedAt, isDeleted, deletedAt
+      FROM sessions
+      WHERE id = ?;
+    `,
+    id,
+  );
+
+  if (!row) {
+    throw new Error('Session not found');
+  }
+
+  return mapSessionRow(row);
 };
 
 export const updateSessionAssignment = async (
