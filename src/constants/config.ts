@@ -7,6 +7,8 @@ export const BACKEND_URL = DEFAULT_BACKEND_URL;
 export const DATABASE_NAME = 'pomodoro.db';
 export const GENERAL_TAG_ID = '00000000-0000-4000-8000-000000000001';
 export const GENERAL_TAG_NAME = 'Allgemein';
+export const GENERAL_TAG_GROUP_ID = '00000000-0000-4000-8000-000000000002';
+export const GENERAL_TAG_GROUP_NAME = 'Allgemein';
 export const FREE_SESSION_TITLE = 'Freie Session';
 
 export const DEFAULT_TIMER_DURATIONS: TimerDurations = {

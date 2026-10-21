@@ -15,7 +15,6 @@ import { GENERAL_TAG_ID } from '../../src/constants/config';
 import { colors, tagPalette } from '../../src/constants/colors';
 import { spacing } from '../../src/constants/spacing';
 import { syncManager } from '../../src/services/sync/syncManager';
-import { toTagGroupsPushPayload } from '../../src/services/sync/payloads';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useSyncStore } from '../../src/store/syncStore';
 import { useTagsStore } from '../../src/store/tagsStore';
@@ -79,7 +78,7 @@ export default function TaskDetailScreen() {
   const [tagPickerMode, setTagPickerMode] = useState<TagPickerMode>('list');
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState<string>(tagPalette[0]);
-  const [newTagGroupName, setNewTagGroupName] = useState<string | null>(null);
+  const [newTagGroupId, setNewTagGroupId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
   const [isTagPickerSaving, setIsTagPickerSaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -110,12 +109,12 @@ export default function TaskDetailScreen() {
     () => buildTagGroupOptions(tags, savedTagGroups),
     [savedTagGroups, tags],
   );
-  const selectedNewTagGroupKey = getTagGroupKey(newTagGroupName);
+  const selectedNewTagGroupKey = getTagGroupKey(newTagGroupId);
   const tagPickerGroups = useMemo<TagPickerGroup[]>(() => {
     const tagsByGroupKey = new Map<string, Tag[]>();
 
     sortTagsByGroupAndName(tags).forEach((tag) => {
-      const groupKey = getTagGroupKey(tag.groupName);
+      const groupKey = getTagGroupKey(tag.groupId);
       const groupTags = tagsByGroupKey.get(groupKey) ?? [];
 
       groupTags.push(tag);
@@ -159,10 +158,10 @@ export default function TaskDetailScreen() {
     setTagPickerMode('list');
     setNewTagName('');
     setNewTagColor(tagPalette[0]);
-    setNewTagGroupName(selectedTag?.groupName ?? null);
+    setNewTagGroupId(selectedTag?.groupId ?? null);
     setNewGroupName('');
     setIsTagPickerSaving(false);
-  }, [selectedTag?.groupName, showTagPicker]);
+  }, [selectedTag?.groupId, showTagPicker]);
 
   const handleEnableRecurring = () => {
     const nextDate = date ?? getTodayDateKey();
@@ -201,7 +200,7 @@ export default function TaskDetailScreen() {
       const createdTag = await createTag({
         name: newTagName,
         color: newTagColor,
-        groupName: newTagGroupName,
+        groupId: newTagGroupId,
       });
 
       setSelectedTagId(createdTag.id);
@@ -226,13 +225,10 @@ export default function TaskDetailScreen() {
     try {
       const createdGroupName = await createTagGroup(normalizedNewGroupName);
 
-      await syncManager
-        .pushTagGroups(toTagGroupsPushPayload(useSettingsStore.getState().tagGroups))
-        .catch(() => undefined);
-      await useSyncStore.getState().loadQueue();
 
       setNewGroupName('');
-      setNewTagGroupName(createdGroupName);
+      const createdGroup = savedTagGroups.find((group) => group.name === createdGroupName);
+      setNewTagGroupId(createdGroup?.id ?? null);
       setTagPickerMode('tag');
     } catch (error) {
       Alert.alert(
@@ -541,7 +537,7 @@ export default function TaskDetailScreen() {
                               styles.groupOption,
                               isSelected ? styles.groupOptionSelected : null,
                             ]}
-                            onPress={() => setNewTagGroupName(option.value)}
+                            onPress={() => setNewTagGroupId(option.value)}
                           >
                             <Text
                               numberOfLines={1}

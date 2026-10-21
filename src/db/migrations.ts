@@ -139,6 +139,63 @@ const migrations: readonly Migration[] = [
       `,
     ],
   },
+  {
+    version: 8,
+    apply: async (db) => {
+      const now = toLocalIsoString();
+      const addColumn = async (table: string, column: string, definition: string) => {
+        const columns = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table});`);
+        if (!columns.some((entry) => entry.name === column)) {
+          await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+        }
+      };
+
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS tag_groups (
+          id TEXT PRIMARY KEY NOT NULL,
+          name TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          isDeleted INTEGER NOT NULL DEFAULT 0,
+          deletedAt TEXT
+        );
+      `);
+      await addColumn('tags', 'groupId', 'TEXT');
+      await addColumn('tags', 'isDeleted', 'INTEGER NOT NULL DEFAULT 0');
+      await addColumn('tags', 'deletedAt', 'TEXT');
+      await addColumn('tasks', 'isDeleted', 'INTEGER NOT NULL DEFAULT 0');
+      await addColumn('tasks', 'deletedAt', 'TEXT');
+      await addColumn('sessions', 'updatedAt', 'TEXT');
+      await addColumn('sessions', 'isDeleted', 'INTEGER NOT NULL DEFAULT 0');
+      await addColumn('sessions', 'deletedAt', 'TEXT');
+
+      await db.runAsync(
+        `INSERT OR IGNORE INTO tag_groups (id, name, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?);`,
+        '00000000-0000-4000-8000-000000000002',
+        'Allgemein',
+        now,
+        now,
+      );
+      await db.runAsync(
+        `UPDATE tags SET groupId = ? WHERE groupId IS NULL
+         AND (groupName IS NULL OR TRIM(groupName) = '' OR LOWER(groupName) = LOWER(?));`,
+        '00000000-0000-4000-8000-000000000002',
+        'Allgemein',
+      );
+      await db.runAsync(
+        `UPDATE sessions SET updatedAt = COALESCE(updatedAt, createdAt, ?);`,
+        now,
+      );
+      await db.runAsync(
+        `INSERT OR IGNORE INTO app_settings (key, value, updatedAt) VALUES ('userId', '', ?);`,
+        now,
+      );
+      await db.runAsync(
+        `DELETE FROM sync_queue WHERE entityType = 'tagGroups' OR endpoint = '/push/tag-groups';`,
+      );
+    },
+  },
 ] as const;
 
 export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> => {

@@ -7,6 +7,8 @@ import {
   getLatestSession,
   getSessionById,
   listSessions,
+  listDeletedSessions,
+  restoreSession,
   updateSession,
   updateSessionAssignment,
 } from '../db/repositories/sessionsRepository';
@@ -24,6 +26,7 @@ interface SessionAssignmentOptions {
 
 interface SessionsStoreState {
   sessions: Session[];
+  deletedSessions: Session[];
   latestSession: Session | null;
   isLoading: boolean;
   loadSessions: () => Promise<void>;
@@ -38,6 +41,7 @@ interface SessionsStoreState {
   assignSession: (sessionId: string, options: SessionAssignmentOptions) => Promise<void>;
   updateSessionEntry: (sessionId: string, input: { title: string; tagId: string }) => Promise<void>;
   deleteSessionEntry: (sessionId: string) => Promise<void>;
+  restoreSessionEntry: (sessionId: string) => Promise<void>;
 }
 
 const swallowSyncError = async (work: Promise<void>): Promise<void> => {
@@ -50,17 +54,19 @@ const swallowSyncError = async (work: Promise<void>): Promise<void> => {
 
 export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
   sessions: [],
+  deletedSessions: [],
   latestSession: null,
   isLoading: false,
   loadSessions: async () => {
     set({ isLoading: true });
 
     try {
-      const [sessions, latestSession] = await Promise.all([
+      const [sessions, latestSession, deletedSessions] = await Promise.all([
         listSessions(),
         getLatestSession(),
+        listDeletedSessions(),
       ]);
-      set({ sessions, latestSession });
+      set({ sessions, latestSession, deletedSessions });
     } finally {
       set({ isLoading: false });
     }
@@ -134,6 +140,12 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
   deleteSessionEntry: async (sessionId) => {
     await deleteSession(sessionId);
     await get().loadSessions();
+    await useSyncStore.getState().loadQueue();
+  },
+  restoreSessionEntry: async (sessionId) => {
+    const restored = await restoreSession(sessionId);
+    await get().loadSessions();
+    await swallowSyncError(syncManager.pushSession(toSessionPushPayload(restored)));
     await useSyncStore.getState().loadQueue();
   },
 }));

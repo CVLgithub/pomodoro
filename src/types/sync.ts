@@ -1,4 +1,4 @@
-export type SyncEntityType = 'task' | 'tag' | 'tagGroups' | 'session';
+export type SyncEntityType = 'task' | 'tag' | 'tagGroup' | 'session';
 export type SyncStatus = 'pending' | 'failed' | 'synced';
 
 export interface SyncQueueItem {

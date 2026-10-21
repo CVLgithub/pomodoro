@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -10,7 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { colors } from '../src/constants/colors';
 import { initializeDatabase } from '../src/db/client';
 import { useAppResume } from '../src/hooks/useAppResume';
-import { downsyncEntries, downsyncOpenTasks } from '../src/services/sync/downsyncService';
+import { downsyncEntries } from '../src/services/sync/downsyncService';
 import { getEntriesRequestUrl } from '../src/services/api/entriesService';
 import { useSessionsStore } from '../src/store/sessionsStore';
 import { useSettingsStore } from '../src/store/settingsStore';
@@ -20,14 +20,10 @@ import { useTasksStore } from '../src/store/tasksStore';
 import { useStopwatchStore } from '../src/store/stopwatchStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { useUiStore } from '../src/store/uiStore';
+import { UserIdOnboarding } from '../src/components/settings/UserIdOnboarding';
 
 const runAutomaticDownsync = async (): Promise<void> => {
-  if (Platform.OS === 'web') {
-    await downsyncEntries();
-    return;
-  }
-
-  await downsyncOpenTasks();
+  await downsyncEntries();
 };
 
 export default function RootLayout() {
@@ -35,6 +31,9 @@ export default function RootLayout() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isBootstrapped = useUiStore((state) => state.isBootstrapped);
   const setBootstrapped = useUiStore((state) => state.setBootstrapped);
+  const userId = useSettingsStore((state) => state.userId);
+  const isDevUserId = useSettingsStore((state) => state.isDevUserId);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -142,6 +141,14 @@ export default function RootLayout() {
         <Stack.Screen name="task/[id]" />
         <Stack.Screen name="tag/[id]" />
       </Stack>
+      {!userId && !isDevUserId && !onboardingDismissed ? (
+        <UserIdOnboarding
+          onComplete={async () => {
+            await useSettingsStore.getState().loadSettings();
+            setOnboardingDismissed(true);
+          }}
+        />
+      ) : null}
     </GestureHandlerRootView>
   );
 }

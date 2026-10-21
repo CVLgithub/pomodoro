@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit"
+    ,"test": "vitest run"
   },
   "expo": {
     "autolinking": {
@@ -45,5 +46,6 @@
   "devDependencies": {
     "@types/react": "~19.2.4",
     "typescript": "~6.0.3"
+    ,"vitest": "^3.2.4"
   }
 }

@@ -11,15 +11,21 @@ import { SectionCard } from '../src/components/ui/SectionCard';
 import { SectionHeader } from '../src/components/ui/SectionHeader';
 import { TagPill } from '../src/components/ui/TagPill';
 import { TextField } from '../src/components/ui/TextField';
-import { DEFAULT_BACKEND_URL, FREE_SESSION_TITLE, GENERAL_TAG_ID } from '../src/constants/config';
+import { DEFAULT_BACKEND_URL, FREE_SESSION_TITLE, GENERAL_TAG_GROUP_ID, GENERAL_TAG_ID } from '../src/constants/config';
 import { colors } from '../src/constants/colors';
 import { radii, spacing } from '../src/constants/spacing';
 import { timerEngine } from '../src/services/timer/timerEngine';
+import { downsyncEntries } from '../src/services/sync/downsyncService';
+import { validateAndNormalizeUserId } from '../src/services/settings/userIdentity';
+import { clearLocalDataAndQueue } from '../src/db/repositories/localDataRepository';
+import { saveLastSyncError, saveLastSyncSuccess } from '../src/db/repositories/settingsRepository';
+import { copyToClipboard } from '../src/utils/clipboard';
 import { notificationService } from '../src/services/notifications/notificationService';
 import { useSessionsStore } from '../src/store/sessionsStore';
 import { useSettingsStore } from '../src/store/settingsStore';
 import { useSyncStore } from '../src/store/syncStore';
 import { useTagsStore } from '../src/store/tagsStore';
+import { useTasksStore } from '../src/store/tasksStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { NotificationPreferences } from '../src/types/notifications';
 import { START_PAGE_OPTIONS } from '../src/types/settings';
@@ -219,6 +225,7 @@ const NotificationSettingsCard = memo(function NotificationSettingsCard({
 export default function SettingsScreen() {
   const router = useRouter();
   const tags = useTagsStore((state) => state.tags);
+  const tasks = useTasksStore((state) => state.tasks);
   const queueItems = useSyncStore((state) => state.items);
   const retryItem = useSyncStore((state) => state.retryItem);
   const retryAll = useSyncStore((state) => state.retryAll);
@@ -233,7 +240,15 @@ export default function SettingsScreen() {
   const saveAutoSwitchToBreaks = useSettingsStore((state) => state.saveAutoSwitchToBreaks);
   const saveStartPage = useSettingsStore((state) => state.saveStartPage);
   const createSessionEntry = useSessionsStore((state) => state.createSessionEntry);
+  const deletedSessions = useSessionsStore((state) => state.deletedSessions);
+  const restoreSessionEntry = useSessionsStore((state) => state.restoreSessionEntry);
   const updateTag = useTagsStore((state) => state.updateTag);
+  const userId = useSettingsStore((state) => state.userId);
+  const isDevUserId = useSettingsStore((state) => state.isDevUserId);
+  const lastSyncSuccessfulAt = useSettingsStore((state) => state.lastSyncSuccessfulAt);
+  const lastSyncError = useSettingsStore((state) => state.lastSyncError);
+  const saveUserId = useSettingsStore((state) => state.saveUserId);
+  const setSyncStatus = useSettingsStore((state) => state.setSyncStatus);
 
   const [backendUrlInput, setBackendUrlInput] = useState(backendUrl);
   const [isSavingBackendUrl, setIsSavingBackendUrl] = useState(false);
@@ -242,10 +257,17 @@ export default function SettingsScreen() {
   const [isSavingManualSession, setIsSavingManualSession] = useState(false);
   const [showCollapsedQueueItems, setShowCollapsedQueueItems] = useState(false);
   const [isEditingTagGroups, setIsEditingTagGroups] = useState(false);
+  const [userIdInput, setUserIdInput] = useState(userId ?? '');
+  const [isEditingUserId, setIsEditingUserId] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
 
   useEffect(() => {
     setBackendUrlInput(backendUrl);
   }, [backendUrl]);
+
+  useEffect(() => {
+    setUserIdInput(userId ?? '');
+  }, [userId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -293,7 +315,7 @@ export default function SettingsScreen() {
     return buildTagGroupOptions(tags, tagGroups).map((group) => ({
       groupKey: group.key,
       groupLabel: group.label,
-      tags: sortedTags.filter((tag) => getTagGroupKey(tag.groupName) === group.key),
+      tags: sortedTags.filter((tag) => getTagGroupKey(tag.groupId) === group.key),
     }));
   }, [tagGroups, tags]);
 
@@ -323,7 +345,7 @@ export default function SettingsScreen() {
           void (async () => {
             try {
               for (const tag of group.tags) {
-                await updateTag(tag.id, { groupName: null });
+                await updateTag(tag.id, { groupId: GENERAL_TAG_GROUP_ID });
               }
               await deleteTagGroup(group.groupLabel);
             } catch (error) {
@@ -351,6 +373,63 @@ export default function SettingsScreen() {
     } finally {
       setIsSavingBackendUrl(false);
     }
+  };
+
+  const handleManualSync = async (): Promise<void> => {
+    setIsManualSyncing(true);
+    setSyncStatus(lastSyncSuccessfulAt, null);
+    try {
+      await downsyncEntries();
+      const successfulAt = new Date().toISOString();
+      await saveLastSyncSuccess(successfulAt);
+      setSyncStatus(successfulAt, null);
+      await Promise.all([
+        useSettingsStore.getState().loadSettings(),
+        useSessionsStore.getState().loadSessions(),
+        useSyncStore.getState().loadQueue(),
+        useTasksStore.getState().loadTasks(),
+        useTagsStore.getState().loadTags(),
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      await saveLastSyncError(message);
+      setSyncStatus(lastSyncSuccessfulAt, message);
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
+
+  const handleSaveUserId = (): void => {
+    let normalized: string;
+    try {
+      normalized = validateAndNormalizeUserId(userIdInput);
+    } catch (error) {
+      Alert.alert('userId ungültig', error instanceof Error ? error.message : 'Ungültige UUID.');
+      return;
+    }
+    Alert.alert(
+      'userId ändern?',
+      'Lokale Daten und die Sync-Queue werden verworfen und anschließend für die neue Identität neu geladen.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Ändern',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await clearLocalDataAndQueue();
+                await saveUserId(normalized);
+                await handleManualSync();
+                setIsEditingUserId(false);
+              } catch (error) {
+                Alert.alert('userId konnte nicht geändert werden', error instanceof Error ? error.message : 'Unbekannter Fehler');
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   const handleAddManualSession = async () => {
@@ -468,6 +547,38 @@ export default function SettingsScreen() {
     >
       <SectionCard>
         <SectionHeader title="Verbindung" subtitle="Lege fest, welche Adresse die App verwendet." />
+        <Text style={styles.preferenceLabel}>userId</Text>
+        {userId ? (
+          <>
+            <Text style={styles.userIdValue} selectable>{userId}</Text>
+            {isDevUserId ? <Text style={styles.warningText}>userId aus Dev-Variable</Text> : null}
+            <View style={styles.actionRow}>
+              <Button label="Kopieren" variant="secondary" onPress={() => void copyToClipboard(userId)} />
+              <Button
+                label="Ändern"
+                variant="danger"
+                onPress={() => setIsEditingUserId(true)}
+              />
+            </View>
+          </>
+        ) : (
+          <Text style={styles.warningText}>Sync ist nicht aktiv. Die App bleibt lokal nutzbar.</Text>
+        )}
+        {isEditingUserId ? (
+          <View style={styles.userIdEditor}>
+            <TextField
+              label="Neue userId"
+              value={userIdInput}
+              onChangeText={setUserIdInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.actionRow}>
+              <Button label="Bestätigen" onPress={handleSaveUserId} />
+              <Button label="Abbrechen" variant="ghost" onPress={() => setIsEditingUserId(false)} />
+            </View>
+          </View>
+        ) : null}
         <TextField
           label="Adresse"
           value={backendUrlInput}
@@ -534,6 +645,50 @@ export default function SettingsScreen() {
             </Pressable>
           ))}
         </View>
+        <View style={styles.syncStatus}>
+          <Button
+            label={isManualSyncing ? 'Synchronisierung läuft ...' : 'Jetzt synchronisieren'}
+            onPress={() => void handleManualSync()}
+            disabled={isManualSyncing || !userId}
+          />
+          {lastSyncSuccessfulAt ? (
+            <Text style={styles.meta}>
+              Zuletzt erfolgreich: {new Date(lastSyncSuccessfulAt).toLocaleString('de-DE')}
+            </Text>
+          ) : null}
+          {lastSyncError ? <Text style={styles.errorText}>Letzter Fehler: {lastSyncError}</Text> : null}
+        </View>
+      </SectionCard>
+
+      <SectionCard>
+        <SectionHeader title="Gelöschte Sessions" subtitle="Gelöschte Sessions bleiben als Tombstones erhalten." />
+        {deletedSessions.length === 0 ? (
+          <EmptyState title="Keine gelöschten Sessions" description="Hier erscheinen gelöschte Sessions." />
+        ) : (
+          deletedSessions.map((session) => (
+            <View key={session.id} style={styles.deletedSessionRow}>
+              <View style={styles.deletedSessionCopy}>
+                <Text style={styles.preferenceLabel}>{session.title}</Text>
+                <Text style={styles.meta}>
+                  {session.date} · {session.durationMinutes} Minuten · Task:{' '}
+                  {session.taskId
+                    ? tasks.find((task) => task.id === session.taskId)?.title ?? session.taskId
+                    : 'Keiner'}
+                </Text>
+              </View>
+              <Button
+                label="Wiederherstellen"
+                variant="secondary"
+                onPress={() =>
+                  void runSyncSafely(
+                    () => restoreSessionEntry(session.id),
+                    'Session konnte nicht wiederhergestellt werden',
+                  )
+                }
+              />
+            </View>
+          ))
+        )}
       </SectionCard>
 
       <SectionCard>
@@ -937,6 +1092,31 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontSize: 13,
     lineHeight: 18,
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  userIdValue: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  userIdEditor: {
+    gap: spacing.sm,
+  },
+  syncStatus: {
+    gap: spacing.sm,
+  },
+  deletedSessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  deletedSessionCopy: {
+    flex: 1,
+    gap: spacing.xs,
   },
   list: {
     gap: spacing.md,

@@ -1,5 +1,6 @@
 import { EntriesResponse } from '../../types/api';
 import { useSettingsStore } from '../../store/settingsStore';
+import { getUserIdSetting } from '../../db/repositories/settingsRepository';
 
 const isLocalHostname = (value: string): boolean =>
   ['localhost', '127.0.0.1', '::1'].includes(value.toLowerCase());
@@ -34,11 +35,16 @@ export const getEntriesRequestUrl = (): string => {
 
 export const fetchEntries = async (): Promise<EntriesResponse> => {
   const requestUrl = getEntriesRequestUrl();
+  const userId = await getUserIdSetting();
+  if (!userId) {
+    throw new Error('Keine userId konfiguriert. Bitte in Phase 4 einrichten.');
+  }
   let response: Response;
 
   try {
     response = await fetch(requestUrl, {
       method: 'GET',
+      headers: { 'X-User-Id': userId },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

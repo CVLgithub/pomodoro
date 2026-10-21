@@ -4,6 +4,8 @@ import {
   DEFAULT_AUTO_SWITCH_TO_BREAKS,
   GENERAL_TAG_ID,
   GENERAL_TAG_NAME,
+  GENERAL_TAG_GROUP_ID,
+  GENERAL_TAG_GROUP_NAME,
 } from '../constants/config';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../constants/notifications';
 import { toLocalIsoString } from '../utils/date';
@@ -13,13 +15,26 @@ export const buildSchemaStatements = (): string[] => {
 
   return [
     `
+      CREATE TABLE IF NOT EXISTS tag_groups (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt TEXT
+      );
+    `,
+    `
       CREATE TABLE IF NOT EXISTS tags (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL COLLATE NOCASE UNIQUE,
         color TEXT NOT NULL,
+        groupId TEXT,
         groupName TEXT,
         createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL
+        updatedAt TEXT NOT NULL,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt TEXT
       );
     `,
     `
@@ -34,6 +49,8 @@ export const buildSchemaStatements = (): string[] => {
         recurrenceDays TEXT NOT NULL DEFAULT '[]',
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt TEXT,
         FOREIGN KEY (tagId) REFERENCES tags (id) ON DELETE RESTRICT
       );
     `,
@@ -60,6 +77,9 @@ export const buildSchemaStatements = (): string[] => {
         tagId TEXT NOT NULL,
         syncStatus TEXT NOT NULL DEFAULT 'pending',
         createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        isDeleted INTEGER NOT NULL DEFAULT 0,
+        deletedAt TEXT,
         FOREIGN KEY (taskId) REFERENCES tasks (id) ON DELETE SET NULL,
         FOREIGN KEY (tagId) REFERENCES tags (id) ON DELETE RESTRICT
       );
@@ -109,6 +129,10 @@ export const buildSchemaStatements = (): string[] => {
     'CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks (date);',
     'CREATE INDEX IF NOT EXISTS idx_tasks_tag_id ON tasks (tagId);',
     'CREATE INDEX IF NOT EXISTS idx_tasks_is_completed ON tasks (isCompleted);',
+    'CREATE INDEX IF NOT EXISTS idx_tags_is_deleted ON tags (isDeleted);',
+    'CREATE INDEX IF NOT EXISTS idx_tasks_is_deleted ON tasks (isDeleted);',
+    'CREATE INDEX IF NOT EXISTS idx_sessions_is_deleted ON sessions (isDeleted);',
+    'CREATE INDEX IF NOT EXISTS idx_tag_groups_is_deleted ON tag_groups (isDeleted);',
     'CREATE INDEX IF NOT EXISTS idx_task_occurrence_completions_date ON task_occurrence_completions (date);',
     'CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions (date DESC);',
     'CREATE INDEX IF NOT EXISTS idx_sessions_sync_status ON sessions (syncStatus);',
@@ -134,8 +158,12 @@ export const buildSchemaStatements = (): string[] => {
       VALUES ('autoSwitchToBreaks', '${String(DEFAULT_AUTO_SWITCH_TO_BREAKS)}', '${now}');
     `,
     `
-      INSERT OR IGNORE INTO tags (id, name, color, createdAt, updatedAt)
-      VALUES ('${GENERAL_TAG_ID}', '${GENERAL_TAG_NAME}', '#5EA2FF', '${now}', '${now}');
+      INSERT OR IGNORE INTO tags (id, name, color, groupId, groupName, createdAt, updatedAt, isDeleted, deletedAt)
+      VALUES ('${GENERAL_TAG_ID}', '${GENERAL_TAG_NAME}', '#5EA2FF', '${GENERAL_TAG_GROUP_ID}', NULL, '${now}', '${now}', 0, NULL);
+    `,
+    `
+      INSERT OR IGNORE INTO tag_groups (id, name, createdAt, updatedAt)
+      VALUES ('${GENERAL_TAG_GROUP_ID}', '${GENERAL_TAG_GROUP_NAME}', '${now}', '${now}');
     `,
     `
       INSERT OR IGNORE INTO timer_state (
@@ -170,6 +198,10 @@ export const buildSchemaStatements = (): string[] => {
         ${DEFAULT_TIMER_DURATIONS.longBreakMinutes},
         '${now}'
       );
+    `,
+    `
+      INSERT OR IGNORE INTO app_settings (key, value, updatedAt)
+      VALUES ('userId', '', '${now}');
     `,
   ];
 };

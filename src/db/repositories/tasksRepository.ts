@@ -22,6 +22,8 @@ type TaskRow = {
   recurrenceDays: string;
   createdAt: string;
   updatedAt: string;
+  isDeleted: number;
+  deletedAt: string | null;
 };
 
 const mapTaskRow = (row: TaskRow): Task => {
@@ -41,6 +43,8 @@ const mapTaskRow = (row: TaskRow): Task => {
     recurrenceDays: recurrence.recurrenceDays,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    isDeleted: Boolean(row.isDeleted),
+    deletedAt: row.deletedAt,
   };
 };
 
@@ -48,8 +52,9 @@ export const listTasks = async (): Promise<Task[]> => {
   const db = await getDatabase();
   const rows = await db.getAllAsync<TaskRow>(
     `
-      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
+      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt, isDeleted, deletedAt
       FROM tasks
+      WHERE isDeleted = 0
       ORDER BY isCompleted ASC, date IS NULL ASC, date ASC, updatedAt DESC;
     `,
   );
@@ -61,9 +66,9 @@ export const getTaskById = async (id: string): Promise<Task | null> => {
   const db = await getDatabase();
   const row = await db.getFirstAsync<TaskRow>(
     `
-      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
+      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt, isDeleted, deletedAt
       FROM tasks
-      WHERE id = ?;
+      WHERE id = ? AND isDeleted = 0;
     `,
     id,
   );
@@ -89,14 +94,16 @@ export const createTask = async (input: CreateTaskInput): Promise<Task> => {
     recurrenceDays: recurrence.recurrenceDays,
     createdAt: now,
     updatedAt: now,
+    isDeleted: false,
+    deletedAt: null,
   };
 
   await db.runAsync(
     `
       INSERT INTO tasks (
-        id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
+        id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt, isDeleted, deletedAt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL);
     `,
     task.id,
     task.title,
@@ -151,6 +158,8 @@ export const updateTask = async (
     recurrenceType: nextRecurrence.recurrenceType,
     recurrenceDays: nextRecurrence.recurrenceDays,
     updatedAt: toLocalIsoString(),
+    isDeleted: false,
+    deletedAt: null,
   };
 
   const recurrenceSettingsChanged =
@@ -170,7 +179,7 @@ export const updateTask = async (
         completedAt = ?,
         recurrenceType = ?,
         recurrenceDays = ?,
-        updatedAt = ?
+        updatedAt = ?, isDeleted = 0, deletedAt = NULL
       WHERE id = ?;
     `,
     updatedTask.title,
@@ -201,7 +210,13 @@ export const deleteTask = async (id: string): Promise<DeleteTaskResult> => {
     'SELECT id FROM sessions WHERE taskId = ?;',
     id,
   );
-  await db.runAsync('DELETE FROM tasks WHERE id = ?;', id);
+  const now = toLocalIsoString();
+  await db.runAsync(
+    'UPDATE tasks SET isDeleted = 1, deletedAt = ?, updatedAt = ? WHERE id = ?;',
+    now,
+    now,
+    id,
+  );
   return {
     affectedSessionIds: sessionRows.map((row) => row.id),
   };
@@ -211,9 +226,9 @@ export const getTasksByDate = async (dateKey: string): Promise<Task[]> => {
   const db = await getDatabase();
   const rows = await db.getAllAsync<TaskRow>(
     `
-      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt
+      SELECT id, title, date, tagId, isCompleted, completedAt, recurrenceType, recurrenceDays, createdAt, updatedAt, isDeleted, deletedAt
       FROM tasks
-      WHERE date = ?
+      WHERE date = ? AND isDeleted = 0
       ORDER BY isCompleted ASC, updatedAt DESC;
     `,
     dateKey,

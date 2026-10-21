@@ -1,6 +1,5 @@
 import {
   PushSessionPayload,
-  PushTagGroupsPayload,
   PushTagPayload,
   PushTaskPayload,
 } from '../../types/api';
@@ -8,7 +7,6 @@ import { Session } from '../../types/session';
 import { TagDeletePayload } from '../../types/tag';
 import { TaskDeletePayload } from '../../types/task';
 import { toLocalIsoString } from '../../utils/date';
-import { normalizeTagGroupNames } from '../../utils/tagGroups';
 
 export const toTaskPushPayload = (task: {
   id: string;
@@ -18,6 +16,10 @@ export const toTaskPushPayload = (task: {
   isCompleted: boolean;
   recurrenceType: 'none' | 'weekly';
   recurrenceDays: (0 | 1 | 2 | 3 | 4 | 5 | 6)[];
+  createdAt: string;
+  updatedAt: string;
+  isDeleted: boolean;
+  deletedAt: string | null;
 }): PushTaskPayload => ({
   id: task.id,
   title: task.title,
@@ -26,22 +28,30 @@ export const toTaskPushPayload = (task: {
   isCompleted: task.isCompleted,
   recurrenceType: task.recurrenceType,
   recurrenceDays: task.recurrenceDays,
+  createdAt: task.createdAt,
+  updatedAt: task.updatedAt,
+  isDeleted: task.isDeleted,
+  deletedAt: task.deletedAt,
 });
 
 export const toTagPushPayload = (tag: {
   id: string;
   name: string;
   color: string;
-  groupName: string | null;
+  groupId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isDeleted: boolean;
+  deletedAt: string | null;
 }): PushTagPayload => ({
   id: tag.id,
   name: tag.name,
   color: tag.color,
-  groupName: tag.groupName,
-});
-
-export const toTagGroupsPushPayload = (tagGroups: string[]): PushTagGroupsPayload => ({
-  tagGroups: normalizeTagGroupNames(tagGroups),
+  groupId: tag.groupId,
+  createdAt: tag.createdAt,
+  updatedAt: tag.updatedAt,
+  isDeleted: tag.isDeleted,
+  deletedAt: tag.deletedAt,
 });
 
 export const toSessionPushPayload = (
@@ -56,17 +66,23 @@ export const toSessionPushPayload = (
     durationMinutes: session.durationMinutes,
     taskId: session.taskId,
     tagId: session.tagId,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    isDeleted: session.isDeleted,
+    deletedAt: session.deletedAt,
   };
 };
 
 export const createTaskDeletePayload = (id: string): TaskDeletePayload => ({
   id,
   deletedAt: toLocalIsoString(),
+  updatedAt: toLocalIsoString(),
   isDeleted: true,
 });
 
 export const createTagDeletePayload = (id: string): TagDeletePayload => ({
   id,
   deletedAt: toLocalIsoString(),
+  updatedAt: toLocalIsoString(),
   isDeleted: true,
 });

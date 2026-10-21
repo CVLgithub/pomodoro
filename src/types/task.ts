@@ -12,6 +12,8 @@ export interface Task {
   recurrenceDays: TaskWeekday[];
   createdAt: string;
   updatedAt: string;
+  isDeleted: boolean;
+  deletedAt: string | null;
 }
 
 export interface CreateTaskInput {
@@ -35,6 +37,7 @@ export interface UpdateTaskInput {
 
 export interface TaskDeletePayload {
   id: string;
+  updatedAt: string;
   deletedAt: string;
   isDeleted: true;
 }
