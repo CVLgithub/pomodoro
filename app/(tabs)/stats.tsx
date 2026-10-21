@@ -25,6 +25,26 @@ import {
 import { confirmAction } from '../../src/utils/confirm';
 import { formatMinutesShort } from '../../src/utils/duration';
 
+const OlderSessionsToggle = ({
+  expanded,
+  onPress,
+}: {
+  expanded: boolean;
+  onPress: () => void;
+}) => (
+  <Pressable
+    accessibilityRole="button"
+    accessibilityState={{ expanded }}
+    onPress={onPress}
+    style={styles.olderSessionsToggle}
+  >
+    <Text style={styles.olderSessionsToggleLabel}>
+      {expanded ? 'Ältere Sessions ausblenden' : 'Ältere Sessions'}
+    </Text>
+    <Text style={styles.olderSessionsToggleHint}>{expanded ? '⌃' : '⌄'}</Text>
+  </Pressable>
+);
+
 export default function StatsScreen() {
   const router = useRouter();
   const sessions = useSessionsStore((state) => state.sessions);
@@ -36,18 +56,33 @@ export default function StatsScreen() {
   const [selectedTagId, setSelectedTagId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
-
-  const groupedSessions = useMemo(() => {
-    return sessions.reduce<Record<string, typeof sessions>>((accumulator, session) => {
-      accumulator[session.date] = [...(accumulator[session.date] ?? []), session];
-      return accumulator;
-    }, {});
-  }, [sessions]);
+  const [showOlderSessions, setShowOlderSessions] = useState(false);
 
   const todayKey = getTodayDateKey();
   const weekStart = getWeekStart();
   const monthStart = getMonthStart();
   const now = new Date();
+
+  const currentMonthSessions = useMemo(
+    () => sessions.filter((session) => isDateWithinRange(session.date, monthStart, now)),
+    [sessions, monthStart, now],
+  );
+  const olderSessions = useMemo(
+    () => sessions.filter((session) => !isDateWithinRange(session.date, monthStart, now)),
+    [sessions, monthStart, now],
+  );
+  const groupedCurrentMonthSessions = useMemo(() => {
+    return currentMonthSessions.reduce<Record<string, typeof sessions>>((accumulator, session) => {
+      accumulator[session.date] = [...(accumulator[session.date] ?? []), session];
+      return accumulator;
+    }, {});
+  }, [currentMonthSessions]);
+  const groupedOlderSessions = useMemo(() => {
+    return olderSessions.reduce<Record<string, typeof sessions>>((accumulator, session) => {
+      accumulator[session.date] = [...(accumulator[session.date] ?? []), session];
+      return accumulator;
+    }, {});
+  }, [olderSessions]);
 
   const todayMinutes = sessions
     .filter((session) => session.date === todayKey)
@@ -59,7 +94,10 @@ export default function StatsScreen() {
     .filter((session) => isDateWithinRange(session.date, monthStart, now))
     .reduce((sum, session) => sum + session.durationMinutes, 0);
 
-  const sortedDates = Object.keys(groupedSessions).sort((left, right) =>
+  const sortedCurrentMonthDates = Object.keys(groupedCurrentMonthSessions).sort((left, right) =>
+    left < right ? 1 : -1,
+  );
+  const sortedOlderDates = Object.keys(groupedOlderSessions).sort((left, right) =>
     left < right ? 1 : -1,
   );
 
@@ -134,21 +172,39 @@ export default function StatsScreen() {
         </View>
       </SectionCard>
 
-      {sortedDates.length === 0 ? (
+      {sortedCurrentMonthDates.length === 0 ? (
         <EmptyState
-          title="Noch keine Sessions"
-          description="Sobald du den Timer abschließt, erscheint hier deine Historie."
+          title="Noch keine Sessions diesen Monat"
+          description="Sobald du den Timer abschließt, erscheint hier deine aktuelle Historie."
         />
       ) : (
-        sortedDates.map((date) => (
+        sortedCurrentMonthDates.map((date) => (
           <SessionDayGroup
             key={date}
             date={date}
-            sessions={groupedSessions[date]}
+            sessions={groupedCurrentMonthSessions[date]}
             onPressSession={openSessionEditor}
           />
         ))
       )}
+
+      {sortedOlderDates.length > 0 && !showOlderSessions ? (
+        <OlderSessionsToggle expanded={false} onPress={() => setShowOlderSessions(true)} />
+      ) : null}
+
+      {sortedOlderDates.length > 0 && showOlderSessions ? (
+        <View style={styles.olderSessionsSection}>
+          <OlderSessionsToggle expanded onPress={() => setShowOlderSessions(false)} />
+          {sortedOlderDates.map((date) => (
+            <SessionDayGroup
+              key={date}
+              date={date}
+              sessions={groupedOlderSessions[date]}
+              onPressSession={openSessionEditor}
+            />
+          ))}
+        </View>
+      ) : null}
 
       <ModalSheet
         visible={Boolean(selectedSession)}
@@ -297,6 +353,29 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 17,
     fontWeight: '600',
+  },
+  olderSessionsSection: {
+    gap: spacing.lg,
+    marginTop: spacing['2xl'],
+    paddingBottom: spacing.lg,
+  },
+  olderSessionsToggle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  olderSessionsToggleLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+    textDecorationColor: colors.textSecondary,
+  },
+  olderSessionsToggleHint: {
+    color: colors.textMuted,
+    fontSize: 16,
+    lineHeight: 16,
   },
   chartCardBody: {
     color: colors.textSecondary,

@@ -1,9 +1,8 @@
-import { Alert, Text, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useShallow } from 'zustand/react/shallow';
 
 import { DurationWheelPicker } from '../../src/components/timer/DurationWheelPicker';
-import { ModeTabs } from '../../src/components/timer/ModeTabs';
 import { TaskAssignmentCard } from '../../src/components/timer/TaskAssignmentCard';
 import { TimerDisplayCard } from '../../src/components/timer/TimerDisplayCard';
 import { Button } from '../../src/components/ui/Button';
@@ -11,19 +10,15 @@ import { Screen } from '../../src/components/ui/Screen';
 import { SectionCard } from '../../src/components/ui/SectionCard';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { useTimer } from '../../src/hooks/useTimer';
-import { useSessionsStore } from '../../src/store/sessionsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
 import { useTimerStore } from '../../src/store/timerStore';
-import { formatTimeLabel } from '../../src/utils/date';
 
 export default function TimerScreen() {
   const router = useRouter();
   const timer = useTimer();
   const tasks = useTasksStore((state) => state.tasks);
   const tags = useTagsStore((state) => state.tags);
-  const latestSession = useSessionsStore((state) => state.latestSession);
-  const assignSession = useSessionsStore((state) => state.assignSession);
   const {
     setMode,
     setDurations,
@@ -32,7 +27,6 @@ export default function TimerScreen() {
     start,
     pause,
     resume,
-    reset,
     finishNow,
   } = useTimerStore(useShallow((state) => ({
     setMode: state.setMode,
@@ -42,7 +36,6 @@ export default function TimerScreen() {
     start: state.start,
     pause: state.pause,
     resume: state.resume,
-    reset: state.reset,
     finishNow: state.finishNow,
   })));
 
@@ -57,58 +50,45 @@ export default function TimerScreen() {
   return (
     <Screen
       title="Timer"
-      subtitle="Starte und steuere deine aktuelle Session."
+      subtitle="Starte deine Session."
       headerRight={<Button label="Einstellungen" variant="ghost" onPress={() => router.push('/settings')} />}
     >
-      <ModeTabs
-        value={timer.activeMode}
-        disabled={timer.status !== 'idle'}
-        onChange={(mode) => void runSafely(() => setMode(mode), 'Modus konnte nicht gesetzt werden')}
-      />
-
       <TimerDisplayCard
         mode={timer.activeMode}
-        status={timer.status}
         formattedRemaining={timer.formattedRemaining}
         progress={timer.progress}
-      />
-<SectionCard>
-        <SectionHeader
-          title="Steuerung"
-          subtitle={
-            timer.activeMode === 'longBreak' && timer.status === 'idle'
-              ? 'Die lange Pause ist bereit.'
-              : 'Start, Pause und Ende steuerst du hier.'
-          }
-        />
-        <View style={{ gap: 12 }}>
-          {timer.status === 'idle' ? (
-            <Button label="Start" onPress={() => void runSafely(start, 'Timer konnte nicht gestartet werden')} />
-          ) : null}
-          {timer.status === 'running' ? (
-            <Button
-              label="Pause"
-              variant="secondary"
-              onPress={() => void runSafely(pause, 'Timer konnte nicht pausiert werden')}
-            />
-          ) : null}
-          {timer.status === 'paused' ? (
-            <Button label="Weiter" onPress={() => void runSafely(resume, 'Timer konnte nicht fortgesetzt werden')} />
-          ) : null}
-          {timer.status !== 'idle' ? (
-            <Button
-              label="Jetzt beenden"
-              variant="danger"
-              onPress={() => void runSafely(finishNow, 'Timer konnte nicht beendet werden')}
-            />
-          ) : null}
+        modeChangeDisabled={timer.status !== 'idle'}
+        onModeChange={() => {
+          const nextMode =
+            timer.activeMode === 'focus'
+              ? 'shortBreak'
+              : timer.activeMode === 'shortBreak'
+                ? 'longBreak'
+                : 'focus';
+          void runSafely(() => setMode(nextMode), 'Modus konnte nicht gesetzt werden');
+        }}
+      >
+        {timer.status === 'idle' ? (
+          <Button label="Start" onPress={() => void runSafely(start, 'Timer konnte nicht gestartet werden')} />
+        ) : null}
+        {timer.status === 'running' ? (
           <Button
-            label="Reset"
-            variant="ghost"
-            onPress={() => void runSafely(reset, 'Timer konnte nicht zurückgesetzt werden')}
+            label="Pause"
+            variant="secondary"
+            onPress={() => void runSafely(pause, 'Timer konnte nicht pausiert werden')}
           />
-        </View>
-      </SectionCard>
+        ) : null}
+        {timer.status === 'paused' ? (
+          <Button label="Weiter" onPress={() => void runSafely(resume, 'Timer konnte nicht fortgesetzt werden')} />
+        ) : null}
+        {timer.status !== 'idle' ? (
+          <Button
+            label="Jetzt beenden"
+            variant="danger"
+            onPress={() => void runSafely(finishNow, 'Timer konnte nicht beendet werden')}
+          />
+        ) : null}
+      </TimerDisplayCard>
       <TaskAssignmentCard
         title="Aktuelle Zuordnung"
         tasks={tasks}
@@ -148,31 +128,6 @@ export default function TimerScreen() {
           />
         </View>
       </SectionCard>
-
-      
-
-      {latestSession ? (
-        <TaskAssignmentCard
-          title="Letzte Session"
-          subtitle={`${formatTimeLabel(latestSession.startTime)} - ${formatTimeLabel(latestSession.endTime)}`}
-          tasks={tasks}
-          tags={tags}
-          selectedTaskId={latestSession.taskId}
-          selectedTagId={latestSession.tagId}
-          onSelectTask={(taskId) =>
-            runSafely(
-              () => assignSession(latestSession.id, { taskId, tagId: latestSession.tagId }),
-              'Session konnte nicht aktualisiert werden',
-            )
-          }
-          onSelectFreeTag={(tagId) =>
-            runSafely(
-              () => assignSession(latestSession.id, { taskId: null, tagId }),
-              'Session konnte nicht aktualisiert werden',
-            )
-          }
-        />
-      ) : null}
     </Screen>
   );
 }
