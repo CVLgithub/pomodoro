@@ -12,6 +12,7 @@ import { initializeDatabase } from '../src/db/client';
 import { useAppResume } from '../src/hooks/useAppResume';
 import { downsyncEntries } from '../src/services/sync/downsyncService';
 import { getEntriesRequestUrl } from '../src/services/api/entriesService';
+import { saveLastSyncError, saveLastSyncSuccess } from '../src/db/repositories/settingsRepository';
 import { useSessionsStore } from '../src/store/sessionsStore';
 import { useSettingsStore } from '../src/store/settingsStore';
 import { useSyncStore } from '../src/store/syncStore';
@@ -24,6 +25,7 @@ import { UserIdOnboarding } from '../src/components/settings/UserIdOnboarding';
 
 const runAutomaticDownsync = async (): Promise<void> => {
   await downsyncEntries();
+  await saveLastSyncSuccess(new Date().toISOString());
 };
 
 export default function RootLayout() {
@@ -45,6 +47,7 @@ export default function RootLayout() {
         try {
           await runAutomaticDownsync();
         } catch (error) {
+          await saveLastSyncError(error instanceof Error ? error.message : 'Unbekannter Fehler');
           console.warn(
             'Automatic downsync failed during bootstrap',
             getEntriesRequestUrl(),
@@ -91,6 +94,7 @@ export default function RootLayout() {
     try {
       await runAutomaticDownsync();
     } catch (error) {
+      await saveLastSyncError(error instanceof Error ? error.message : 'Unbekannter Fehler');
       console.warn(
         'Automatic downsync failed on resume',
         getEntriesRequestUrl(),

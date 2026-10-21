@@ -1,7 +1,9 @@
 import { GENERAL_TAG_ID, GENERAL_TAG_NAME } from '../../constants/config';
 import { getDatabase } from '../../db/client';
 import { listTagGroups } from '../../db/repositories/tagGroupsRepository';
-import { listSessions } from '../../db/repositories/sessionsRepository';
+import {
+  listAllSessions,
+} from '../../db/repositories/sessionsRepository';
 import { listTags } from '../../db/repositories/tagsRepository';
 import { listTasks } from '../../db/repositories/tasksRepository';
 import { EntriesResponse, EntriesSession, EntriesTag, EntriesTask } from '../../types/api';
@@ -116,7 +118,7 @@ const loadLocalEntriesState = async (): Promise<LocalEntriesState> => {
   const [tags, tasks, sessions, savedTagGroups] = await Promise.all([
     listTags(),
     listTasks(),
-    listSessions(),
+    listAllSessions(),
     listTagGroups(),
   ]);
 
@@ -390,6 +392,23 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
       );
     }
 
+    const remoteSessionIds = new Set(entries.sessions.map((session) => session.id));
+    for (const localSession of localState.sessionsById.values()) {
+      if (!localSession.isDeleted && !remoteSessionIds.has(localSession.id)) {
+        const now = toLocalIsoString();
+        await db.runAsync(
+          `
+            UPDATE sessions
+            SET isDeleted = 1, deletedAt = ?, updatedAt = ?, syncStatus = 'synced'
+            WHERE id = ? AND isDeleted = 0 AND syncStatus = 'synced';
+          `,
+          now,
+          now,
+          localSession.id,
+        );
+      }
+    }
+
     await db.execAsync('COMMIT;');
   } catch (error) {
     await db.execAsync('ROLLBACK;');
@@ -641,7 +660,21 @@ export const applyPendingDownsyncEntry = async (
 };
 
 export const downsyncEntries = async (): Promise<void> => {
-  await syncManager.flushQueue();
+  let queueError: unknown = null;
+  try {
+    await syncManager.flushQueue();
+  } catch (error) {
+    queueError = error;
+  }
+
   const entries = await fetchNormalizedEntries();
   await applyEntries(entries);
+
+  if (queueError) {
+    throw new Error(
+      `Serverdaten wurden geladen, aber ausstehende Übertragungen konnten nicht abgeschlossen werden: ${
+        queueError instanceof Error ? queueError.message : 'Unbekannter Fehler'
+      }`,
+    );
+  }
 };

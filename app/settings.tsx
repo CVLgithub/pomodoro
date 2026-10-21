@@ -96,6 +96,15 @@ type SettingsTagGroup = {
   tags: Tag[];
 };
 
+type SettingsCategory = 'app' | 'notifications' | 'user' | 'sync';
+
+const SETTINGS_CATEGORIES: Array<{ value: SettingsCategory; label: string }> = [
+  { value: 'app', label: 'App' },
+  { value: 'notifications', label: 'Hinweise' },
+  { value: 'user', label: 'Nutzer' },
+  { value: 'sync', label: 'Sync' },
+];
+
 const NotificationToggleRow = ({
   label,
   description,
@@ -139,7 +148,7 @@ const NotificationSettingsCard = memo(function NotificationSettingsCard({
     setDraftPreferences(notificationPreferences);
   }, [notificationPreferences]);
 
-  const [notificationsSupported, setNotificationsSupported] = useState(false);
+  const [notificationsSupported, setNotificationsSupported] = useState<boolean | null>(null);
 
   useEffect(() => {
     setNotificationsSupported(notificationService.isSupported());
@@ -160,7 +169,7 @@ const NotificationSettingsCard = memo(function NotificationSettingsCard({
         title="Benachrichtigungen"
         subtitle="Lege fest, wann du erinnert werden möchtest."
       />
-      {!notificationsSupported ? (
+      {notificationsSupported === false ? (
         <Text style={styles.warningText}>
           Benachrichtigungen sind auf diesem Gerät noch nicht verfügbar.
         </Text>
@@ -260,6 +269,7 @@ export default function SettingsScreen() {
   const [userIdInput, setUserIdInput] = useState(userId ?? '');
   const [isEditingUserId, setIsEditingUserId] = useState(false);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('app');
 
   useEffect(() => {
     setBackendUrlInput(backendUrl);
@@ -545,7 +555,31 @@ export default function SettingsScreen() {
       subtitle="Passe Timer, Tags und App-Verhalten an."
       headerRight={<Button label="Schließen" variant="ghost" onPress={() => router.back()} />}
     >
-      <SectionCard>
+      <View style={styles.categoryBar}>
+        {SETTINGS_CATEGORIES.map((category) => (
+          <Pressable
+            key={category.value}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeCategory === category.value }}
+            onPress={() => setActiveCategory(category.value)}
+            style={[
+              styles.categoryTab,
+              activeCategory === category.value ? styles.categoryTabSelected : null,
+            ]}
+          >
+            <Text
+              style={[
+                styles.categoryTabLabel,
+                activeCategory === category.value ? styles.categoryTabLabelSelected : null,
+              ]}
+            >
+              {category.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {activeCategory === 'user' ? <SectionCard>
         <SectionHeader title="Verbindung" subtitle="Lege fest, welche Adresse die App verwendet." />
         <Text style={styles.preferenceLabel}>userId</Text>
         {userId ? (
@@ -603,14 +637,16 @@ export default function SettingsScreen() {
           />
         </View>
         <Text style={styles.meta}>Aktuelle Adresse: {backendUrl}</Text>
-      </SectionCard>
+      </SectionCard> : null}
 
-      <NotificationSettingsCard
-        notificationPreferences={notificationPreferences}
-        onSave={persistNotificationPreferences}
-      />
+      {activeCategory === 'notifications' ? (
+        <NotificationSettingsCard
+          notificationPreferences={notificationPreferences}
+          onSave={persistNotificationPreferences}
+        />
+      ) : null}
 
-      <SectionCard>
+      {activeCategory === 'user' ? <SectionCard>
         <SectionHeader
           title="Startseite"
           subtitle="Wähle, welcher Bereich beim Öffnen der App erscheint."
@@ -645,22 +681,10 @@ export default function SettingsScreen() {
             </Pressable>
           ))}
         </View>
-        <View style={styles.syncStatus}>
-          <Button
-            label={isManualSyncing ? 'Synchronisierung läuft ...' : 'Jetzt synchronisieren'}
-            onPress={() => void handleManualSync()}
-            disabled={isManualSyncing || !userId}
-          />
-          {lastSyncSuccessfulAt ? (
-            <Text style={styles.meta}>
-              Zuletzt erfolgreich: {new Date(lastSyncSuccessfulAt).toLocaleString('de-DE')}
-            </Text>
-          ) : null}
-          {lastSyncError ? <Text style={styles.errorText}>Letzter Fehler: {lastSyncError}</Text> : null}
-        </View>
       </SectionCard>
+      : null}
 
-      <SectionCard>
+      {activeCategory === 'sync' ? <SectionCard>
         <SectionHeader title="Gelöschte Sessions" subtitle="Gelöschte Sessions bleiben als Tombstones erhalten." />
         {deletedSessions.length === 0 ? (
           <EmptyState title="Keine gelöschten Sessions" description="Hier erscheinen gelöschte Sessions." />
@@ -689,9 +713,9 @@ export default function SettingsScreen() {
             </View>
           ))
         )}
-      </SectionCard>
+      </SectionCard> : null}
 
-      <SectionCard>
+      {activeCategory === 'user' ? <SectionCard>
         <SectionHeader
           title="Timer"
           subtitle="Lege fest, was nach einer abgeschlossenen Session passiert."
@@ -709,9 +733,9 @@ export default function SettingsScreen() {
             });
           }}
         />
-      </SectionCard>
+      </SectionCard> : null}
 
-      <SectionCard>
+      {activeCategory === 'app' ? <SectionCard>
         <SectionHeader
           title="Tags"
           subtitle="Erstelle Tags und ordne sie Gruppen zu."
@@ -772,11 +796,11 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
         ) : null}
-      </SectionCard>
+      </SectionCard> : null}
 
-      <SectionCard>
+      {activeCategory === 'app' ? <SectionCard>
         <SectionHeader
-          title="Vergangene Session"
+          title="Vergangene Sessions"
           subtitle="Erfasse eine bereits abgeschlossene Session manuell."
         />
         <TextField
@@ -877,9 +901,9 @@ export default function SettingsScreen() {
             disabled={isSavingManualSession}
           />
         </View>
-      </SectionCard>
+      </SectionCard> : null}
 
-      <SectionCard>
+      {activeCategory === 'sync' ? <SectionCard>
         <SectionHeader
           title="Import"
           subtitle="Prüfe neue oder geänderte Einträge und übernimm sie gezielt."
@@ -894,9 +918,22 @@ export default function SettingsScreen() {
         <Text style={styles.meta}>
           Du entscheidest dort für jeden Eintrag einzeln.
         </Text>
-      </SectionCard>
+        <View style={styles.syncStatus}>
+          <Button
+            label={isManualSyncing ? 'Synchronisierung läuft ...' : 'Jetzt synchronisieren'}
+            onPress={() => void handleManualSync()}
+            disabled={isManualSyncing || !userId}
+          />
+          {lastSyncSuccessfulAt ? (
+            <Text style={styles.meta}>
+              Zuletzt erfolgreich: {new Date(lastSyncSuccessfulAt).toLocaleString('de-DE')}
+            </Text>
+          ) : null}
+          {lastSyncError ? <Text style={styles.errorText}>Letzter Fehler: {lastSyncError}</Text> : null}
+        </View>
+      </SectionCard> : null}
 
-      <SectionCard>
+      {activeCategory === 'sync' ? <SectionCard>
         <SectionHeader
           title="Ausstehende Übertragungen"
           subtitle="Einträge, die noch einmal gesendet werden müssen."
@@ -963,12 +1000,45 @@ export default function SettingsScreen() {
             ) : null}
           </>
         )}
-      </SectionCard>
+      </SectionCard> : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  categoryBar: {
+    flexDirection: 'row',
+    width: '100%',
+    padding: spacing.xs,
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceMuted,
+    marginBottom: spacing.xs,
+  },
+  categoryTab: {
+    flex: 1,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xs,
+    borderRadius: radii.md,
+  },
+  categoryTabSelected: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
+  },
+  categoryTabLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  categoryTabLabelSelected: {
+    color: colors.textPrimary,
+  },
   meta: {
     color: colors.textMuted,
     fontSize: 13,

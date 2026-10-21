@@ -138,8 +138,9 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     await useSyncStore.getState().loadQueue();
   },
   deleteSessionEntry: async (sessionId) => {
-    await deleteSession(sessionId);
+    const deletedSession = await deleteSession(sessionId);
     await get().loadSessions();
+    await swallowSyncError(syncManager.pushSession(toSessionPushPayload(deletedSession)));
     await useSyncStore.getState().loadQueue();
   },
   restoreSessionEntry: async (sessionId) => {
