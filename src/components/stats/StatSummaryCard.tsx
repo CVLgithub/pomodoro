@@ -1,4 +1,5 @@
-import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import type { ComponentProps } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
@@ -6,7 +7,7 @@ import { radii, spacing } from '../../constants/spacing';
 interface StatSummaryCardProps {
   label: string;
   value: string;
-  style?: StyleProp<ViewStyle>;
+  style?: ComponentProps<typeof View>['style'];
 }
 
 export const StatSummaryCard = ({ label, value, style }: StatSummaryCardProps) => (

@@ -1,11 +1,10 @@
 import { ReactNode } from 'react';
+import type { ComponentProps } from 'react';
 import {
   ScrollView,
-  StyleProp,
   StyleSheet,
   Text,
   View,
-  ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -20,7 +19,7 @@ interface ScreenProps {
   footer?: ReactNode;
   children: ReactNode;
   scroll?: boolean;
-  contentContainerStyle?: StyleProp<ViewStyle>;
+  contentContainerStyle?: ComponentProps<typeof View>['style'];
 }
 
 export const Screen = ({

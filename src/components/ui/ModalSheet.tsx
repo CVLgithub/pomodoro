@@ -1,14 +1,13 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentProps } from 'react';
 import {
   Animated,
   Easing,
   Modal,
   Pressable,
-  StyleProp,
   StyleSheet,
   Text,
   View,
-  ViewStyle,
   useWindowDimensions,
 } from 'react-native';
 import {
@@ -23,7 +22,7 @@ import { radii, spacing } from '../../constants/spacing';
 
 type ModalSheetSwipeAreaProps = {
   children: ReactNode;
-  style?: StyleProp<ViewStyle>;
+  style?: ComponentProps<typeof View>['style'];
 };
 
 type ModalSheetRenderProps = {
