@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { ComponentRef, forwardRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,7 +15,7 @@ interface TextFieldProps extends TextInputProps {
   helperText?: string;
 }
 
-export const TextField = forwardRef<TextInput, TextFieldProps>(
+export const TextField = forwardRef<ComponentRef<typeof TextInput>, TextFieldProps>(
   ({ label, helperText, style, ...props }, ref) => (
     <View style={styles.container}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
@@ -56,4 +56,3 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
-

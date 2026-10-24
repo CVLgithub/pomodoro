@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
-import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import type { ComponentProps } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
@@ -9,7 +10,7 @@ export const SectionCard = ({
   style,
 }: {
   children: ReactNode;
-  style?: StyleProp<ViewStyle>;
+  style?: ComponentProps<typeof View>['style'];
 }) => <View style={[styles.card, style]}>{children}</View>;
 
 const styles = StyleSheet.create({
