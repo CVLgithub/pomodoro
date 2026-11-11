@@ -15,5 +15,5 @@ export default function Index() {
   const startPage = useSettingsStore((state) => state.startPage);
 
   return <Redirect href={startPageRoutes[startPage]} />;
-}
+} 
 
