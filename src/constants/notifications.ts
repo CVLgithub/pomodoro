@@ -6,4 +6,6 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   dailyFocusGoalHours: null,
 };
 
-export const DAILY_FOCUS_GOAL_OPTIONS = [1, 2, 4, 6] as const;
+/** Bereich des Tagesziel-Reglers; 0 Stunden heißt „aus“. */
+export const DAILY_FOCUS_GOAL_MAX_HOURS = 10;
+export const DAILY_FOCUS_GOAL_STEP_HOURS = 0.5;

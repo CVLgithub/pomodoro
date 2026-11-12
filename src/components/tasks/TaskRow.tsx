@@ -1,20 +1,24 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
-import { radii, spacing } from '../../constants/spacing';
+import { useSettingsStore } from '../../store/settingsStore';
+import { themedStyles } from '../../theme/runtime';
 import { Tag } from '../../types/tag';
 import { Task } from '../../types/task';
 import { formatFullDateLabel } from '../../utils/date';
+import { formatTagWithGroup } from '../../utils/tagGroups';
 import { formatTaskRecurrenceDays, isTaskRecurring } from '../../utils/taskRecurrence';
 import { Ionicon } from '../ui/Ionicon';
-import { TagPill } from '../ui/TagPill';
+import { haptics } from '../../utils/haptics';
 
 interface TaskRowProps {
   task: Task;
   tag: Tag | undefined;
   onPress: () => void;
   onToggle: (value: boolean) => void;
-  variant?: 'default' | 'completed';
+  /** Zeichnet eine Trennlinie über der Zeile (für alle außer der ersten in einer Fläche). */
+  separated?: boolean;
+  /** `undefined` zeigt das Datum der Aufgabe, `null` blendet es aus. */
   displayDate?: string | null;
   isCompleted?: boolean;
   completedAt?: string | null;
@@ -26,159 +30,141 @@ export const TaskRow = ({
   tag,
   onPress,
   onToggle,
-  variant = 'default',
+  separated = false,
   displayDate,
   isCompleted,
   completedAt,
   disableToggle = false,
 }: TaskRowProps) => {
+  // Die Gruppe steht als Vorsatz vor dem Tag ("Uni › Mathe") und braucht so
+  // keine eigene Zeile. "Allgemein" bleibt weg, weil es nichts einordnet.
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
+  const tagLabel = tag ? formatTagWithGroup(tag, tagGroups) : null;
   const resolvedIsCompleted = isCompleted ?? task.isCompleted;
   const resolvedCompletedAt = completedAt ?? task.completedAt;
   const recurring = isTaskRecurring(task);
-  const completedAtLabel =
-    resolvedIsCompleted && resolvedCompletedAt
-      ? `Erledigt am ${formatFullDateLabel(resolvedCompletedAt)}`
-      : null;
   const dateLabel = displayDate !== undefined ? displayDate : task.date;
-  const recurrenceLabel = recurring ? formatTaskRecurrenceDays(task.recurrenceDays) : null;
+  const meta = [
+    tagLabel,
+    recurring ? formatTaskRecurrenceDays(task.recurrenceDays) || 'wiederholend' : null,
+    dateLabel,
+    resolvedIsCompleted && resolvedCompletedAt
+      ? `erledigt am ${formatFullDateLabel(resolvedCompletedAt)}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
-    <Pressable
-      style={[
-        styles.container,
-        variant === 'completed' ? styles.containerCompleted : null,
-      ]}
-      onPress={onPress}
-    >
+    <View style={[styles.container, separated ? styles.separated : null]}>
       <Pressable
         accessibilityRole="checkbox"
+        accessibilityLabel={`${task.title} erledigt`}
         accessibilityState={{ checked: resolvedIsCompleted, disabled: disableToggle }}
         disabled={disableToggle}
-        onPress={(event) => {
-          event.stopPropagation();
-          if (disableToggle) {
-            return;
+        onPress={() => {
+          if (resolvedIsCompleted) {
+            haptics.light();
+          } else {
+            haptics.success();
           }
 
           onToggle(!resolvedIsCompleted);
         }}
-        style={[
-          styles.checkbox,
-          resolvedIsCompleted ? styles.checkboxChecked : null,
-          disableToggle ? styles.checkboxDisabled : null,
-        ]}
+        style={styles.checkboxArea}
       >
-        {resolvedIsCompleted ? (
-          <Ionicon name="checkmark" size={16} color={colors.background} />
-        ) : null}
-      </Pressable>
-      <View style={styles.content}>
-        <Text
+        <View
           style={[
-            styles.title,
-            resolvedIsCompleted ? styles.titleCompleted : null,
-            variant === 'completed' ? styles.titleCompletedRow : null,
+            styles.checkbox,
+            resolvedIsCompleted ? styles.checkboxChecked : null,
+            disableToggle ? styles.checkboxDisabled : null,
           ]}
+        >
+          {resolvedIsCompleted ? (
+            <Ionicon name="checkmark" size={16} color={colors.onAccent} />
+          ) : null}
+        </View>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={onPress} style={styles.content}>
+        <Text
+          style={[styles.title, resolvedIsCompleted ? styles.titleCompleted : null]}
+          numberOfLines={2}
         >
           {task.title}
         </Text>
-        <View style={styles.meta}>
-          {tag ? <TagPill label={tag.name} color={tag.color} /> : null}
-          {recurring ? (
-            <View style={styles.recurrenceBadge}>
-              <Ionicon name="repeat" size={12} color={colors.accent} />
-              <Text style={styles.recurrenceLabel}>
-                {recurrenceLabel ? `Wiederholend - ${recurrenceLabel}` : 'Wiederholend'}
-              </Text>
-            </View>
-          ) : null}
-          {dateLabel ? <Text style={styles.dateLabel}>{dateLabel}</Text> : null}
-          {completedAtLabel ? (
-            <Text style={styles.completedAtLabel}>{completedAtLabel}</Text>
-          ) : null}
-        </View>
-      </View>
-    </Pressable>
+        {meta ? (
+          <View style={styles.meta}>
+            {tag ? <View style={[styles.dot, { backgroundColor: tag.color }]} /> : null}
+            <Text style={styles.metaLabel} numberOfLines={1}>
+              {meta}
+            </Text>
+          </View>
+        ) : null}
+      </Pressable>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
   },
-  containerCompleted: {
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: 'rgba(70, 195, 123, 0.18)',
-    opacity: 0.8,
+  separated: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  checkbox: {
-    width: 26,
-    height: 26,
-    borderRadius: radii.pill,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+  checkboxArea: {
+    width: 54,
+    minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceElevated,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.textMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: colors.success,
-    borderColor: colors.success,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   checkboxDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   content: {
     flex: 1,
-    gap: spacing.sm,
+    gap: 1,
+    paddingVertical: 8,
+    paddingRight: 16,
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 17,
+    fontWeight: '600',
   },
   titleCompleted: {
     color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
-  titleCompletedRow: {
-    color: colors.textSecondary,
-  },
   meta: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
     alignItems: 'center',
+    gap: 6,
   },
-  recurrenceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(94, 162, 255, 0.28)',
-    backgroundColor: 'rgba(94, 162, 255, 0.12)',
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  recurrenceLabel: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dateLabel: {
-    color: colors.textMuted,
+  metaLabel: {
+    flex: 1,
+    color: colors.textSecondary,
     fontSize: 13,
   },
-  completedAtLabel: {
-    color: colors.success,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-});
+}));

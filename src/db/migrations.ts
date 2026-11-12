@@ -196,6 +196,18 @@ const migrations: readonly Migration[] = [
       );
     },
   },
+  {
+    // Verlängerung einer laufenden Timer-Session ("+5"), rein lokal.
+    version: 9,
+    apply: async (db) => {
+      const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(timer_state);');
+      if (!columns.some((column) => column.name === 'extraSeconds')) {
+        await db.execAsync(
+          'ALTER TABLE timer_state ADD COLUMN extraSeconds INTEGER NOT NULL DEFAULT 0;',
+        );
+      }
+    },
+  },
 ] as const;
 
 export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> => {

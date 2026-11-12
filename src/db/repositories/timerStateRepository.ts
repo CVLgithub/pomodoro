@@ -13,6 +13,7 @@ const buildDefaultTimerState = (): TimerStateRecord => ({
   startedAt: null,
   expectedEndAt: null,
   pausedRemainingSeconds: null,
+  extraSeconds: 0,
   selectedTaskId: null,
   selectedTagId: GENERAL_TAG_ID,
   completedFocusCountInCycle: 0,
@@ -32,6 +33,7 @@ export const getTimerState = async (): Promise<TimerStateRecord> => {
         startedAt,
         expectedEndAt,
         pausedRemainingSeconds,
+        extraSeconds,
         selectedTaskId,
         selectedTagId,
         completedFocusCountInCycle,
@@ -44,7 +46,7 @@ export const getTimerState = async (): Promise<TimerStateRecord> => {
     `,
   );
 
-  return row ?? buildDefaultTimerState();
+  return row ? { ...row, extraSeconds: row.extraSeconds ?? 0 } : buildDefaultTimerState();
 };
 
 export const saveTimerState = async (
@@ -66,6 +68,7 @@ export const saveTimerState = async (
         startedAt,
         expectedEndAt,
         pausedRemainingSeconds,
+        extraSeconds,
         selectedTaskId,
         selectedTagId,
         completedFocusCountInCycle,
@@ -74,7 +77,7 @@ export const saveTimerState = async (
         longBreakMinutes,
         updatedAt
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `,
     record.id,
     record.activeMode,
@@ -83,6 +86,7 @@ export const saveTimerState = async (
     record.startedAt,
     record.expectedEndAt,
     record.pausedRemainingSeconds,
+    record.extraSeconds ?? 0,
     record.selectedTaskId,
     record.selectedTagId,
     record.completedFocusCountInCycle,

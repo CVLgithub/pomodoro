@@ -213,11 +213,3 @@ export const getResolvedTaskOccurrencesInRange = (
 
   return occurrences.sort(compareResolvedTaskOccurrences);
 };
-
-export const getTaskScheduleLabel = (task: Task): string | null => {
-  if (isTaskRecurring(task)) {
-    return `Wiederholend - ${formatTaskRecurrenceDays(task.recurrenceDays)}`;
-  }
-
-  return task.date;
-};

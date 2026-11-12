@@ -12,12 +12,16 @@ import {
   getBackendUrlSetting,
   getAutoSwitchToBreaksSetting,
   getStartPageSetting,
+  getThemeSetting,
   saveNotificationPreferences,
   saveBackendUrlSetting,
   saveAutoSwitchToBreaksSetting,
   saveStartPageSetting,
+  saveThemeSetting,
   saveUserIdSetting,
 } from '../db/repositories/settingsRepository';
+import { DEFAULT_THEME, ThemeName } from '../theme/palettes';
+import { setActiveTheme } from '../theme/runtime';
 import { validateAndNormalizeUserId } from '../services/settings/userIdentity';
 import { normalizeCustomTagGroupName } from '../utils/tagGroups';
 import { TagGroup } from '../types/tagGroup';
@@ -39,6 +43,7 @@ interface SettingsStoreState {
   notificationPreferences: NotificationPreferences;
   autoSwitchToBreaks: boolean;
   startPage: StartPage;
+  theme: ThemeName;
   tagGroups: TagGroup[];
   isHydrated: boolean;
   loadSettings: () => Promise<void>;
@@ -46,10 +51,10 @@ interface SettingsStoreState {
   saveNotificationPreferences: (value: NotificationPreferences) => Promise<void>;
   saveAutoSwitchToBreaks: (value: boolean) => Promise<void>;
   saveStartPage: (value: StartPage) => Promise<void>;
+  saveTheme: (value: ThemeName) => Promise<void>;
   saveUserId: (value: string) => Promise<string>;
-  setSyncStatus: (successfulAt: string | null, error: string | null) => void;
-  createTagGroup: (value: string) => Promise<string>;
-  deleteTagGroup: (value: string) => Promise<void>;
+  createTagGroup: (value: string) => Promise<TagGroup>;
+  deleteTagGroup: (groupId: string) => Promise<void>;
 }
 
 const normalizeBackendUrl = (value: string): string => value.trim().replace(/\/+$/, '');
@@ -84,6 +89,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
   autoSwitchToBreaks: DEFAULT_AUTO_SWITCH_TO_BREAKS,
   startPage: DEFAULT_START_PAGE,
+  theme: DEFAULT_THEME,
   tagGroups: [],
   isHydrated: false,
   loadSettings: async () => {
@@ -96,6 +102,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
       userId,
       devUserId,
       syncStatus,
+      theme,
     ] = await Promise.all([
       getNotificationPreferences(),
       getAutoSwitchToBreaksSetting(),
@@ -104,8 +111,11 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
       getUserIdSetting(),
       isDevUserIdSetting(),
       getLastSyncStatus(),
+      getThemeSetting(),
     ]);
+    setActiveTheme(theme);
     set({
+      theme,
       backendUrl,
       userId,
       isDevUserId: devUserId,
@@ -135,14 +145,17 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     const startPage = await saveStartPageSetting(value);
     set({ startPage, isHydrated: true });
   },
+  saveTheme: async (value) => {
+    const theme = await saveThemeSetting(value);
+    setActiveTheme(theme);
+    set({ theme, isHydrated: true });
+  },
   saveUserId: async (value) => {
     const normalized = validateAndNormalizeUserId(value);
     await saveUserIdSetting(normalized);
     set({ userId: normalized, isDevUserId: false, isHydrated: true });
     return normalized;
   },
-  setSyncStatus: (successfulAt, error) =>
-    set({ lastSyncSuccessfulAt: successfulAt, lastSyncError: error }),
   createTagGroup: async (value) => {
     const groupName = normalizeCustomTagGroupName(value);
 
@@ -165,25 +178,16 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     const tagGroups = [...existingGroups, group];
     set({ tagGroups, isHydrated: true });
 
-    return group.name;
+    return group;
   },
-  deleteTagGroup: async (value) => {
-    const groupName = normalizeCustomTagGroupName(value);
+  deleteTagGroup: async (groupId) => {
+    const group = get().tagGroups.find((entry) => entry.id === groupId);
 
-    if (!groupName) {
-      throw new Error('Ungültige Tag-Gruppe');
-    }
-
-    const existingGroups = get().tagGroups;
-    const groups = get().tagGroups;
-    const group = groups.find(
-      (entry) => entry.name.localeCompare(groupName, 'de-DE', { sensitivity: 'base' }) === 0,
-    );
     if (!group) {
       throw new Error('Tag-Gruppe nicht gefunden');
     }
-    const tagGroups = existingGroups.filter((existingGroup) => existingGroup.id !== group.id);
 
+    // Das Repository hängt die Tags der Gruppe auf "Allgemein" um.
     const affectedTagIds = await deleteTagGroupRecord(group.id);
     for (const tagId of affectedTagIds) {
       const tag = await getTagById(tagId);
@@ -191,13 +195,17 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
         await syncManager.pushTag(tag.id, toTagPushPayload(tag));
       }
     }
+
+    const deletedAt = new Date().toISOString();
     await syncManager.pushTagGroup({
       ...group,
       isDeleted: true,
-      deletedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      deletedAt,
+      updatedAt: deletedAt,
     });
-    set({ tagGroups, isHydrated: true });
-
+    set({
+      tagGroups: get().tagGroups.filter((entry) => entry.id !== group.id),
+      isHydrated: true,
+    });
   },
 }));

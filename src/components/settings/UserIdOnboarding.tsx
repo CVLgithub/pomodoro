@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
-import { spacing } from '../../constants/spacing';
 import { getLocalDataSummary } from '../../db/repositories/localDataRepository';
-import { downsyncEntries } from '../../services/sync/downsyncService';
+import { syncAndReload } from '../../services/sync/fullSync';
 import { validateAndNormalizeUserId, requiresNewIdentityWarning } from '../../services/settings/userIdentity';
 import { createUuid } from '../../utils/uuid';
 import { useSettingsStore } from '../../store/settingsStore';
 import { Button } from '../ui/Button';
+import { Segmented } from '../ui/Segmented';
 import { TextField } from '../ui/TextField';
+import { themedStyles } from '../../theme/runtime';
 
 export const UserIdOnboarding = ({ onComplete }: { onComplete: () => Promise<void> }) => {
   const saveUserId = useSettingsStore((state) => state.saveUserId);
@@ -23,11 +24,8 @@ export const UserIdOnboarding = ({ onComplete }: { onComplete: () => Promise<voi
     setError(null);
     try {
       await saveUserId(userId);
-      try {
-        await downsyncEntries();
-      } catch {
-        // The identity is saved even when the first sync is offline.
-      }
+      // Die userId bleibt gespeichert, auch wenn der erste Abgleich offline scheitert.
+      await syncAndReload();
       await onComplete();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'userId konnte nicht gespeichert werden.');
@@ -64,67 +62,94 @@ export const UserIdOnboarding = ({ onComplete }: { onComplete: () => Promise<voi
 
   return (
     <View style={styles.overlay}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Sync einrichten</Text>
-        <Text style={styles.description}>
-          Ohne userId bleibt die App lokal nutzbar. Der Sync ist dann noch nicht aktiv.
+      <View style={styles.card} accessibilityViewIsModal>
+        <Text style={styles.title} accessibilityRole="header">
+          Sync einrichten
         </Text>
-        <View style={styles.modeRow}>
-          <Button
-            label="Bestehende ID eintragen"
-            variant={mode === 'existing' ? 'primary' : 'secondary'}
-            onPress={() => setMode('existing')}
-          />
-          <Button
-            label="Neue ID erzeugen"
-            variant={mode === 'new' ? 'primary' : 'secondary'}
-            onPress={() => setMode('new')}
-          />
-        </View>
+        <Text style={styles.description}>
+          Geräte mit derselben userId teilen sich einen Datenbestand. Ohne userId bleibt die App
+          lokal nutzbar; du kannst sie später in den Einstellungen unter „Verbindung“ eintragen.
+        </Text>
+        <Segmented label="Art der userId" options={MODE_OPTIONS} value={mode} onChange={setMode} />
         {mode === 'existing' ? (
           <TextField
             label="userId"
             value={value}
-            onChangeText={setValue}
+            onChangeText={(text) => {
+              setValue(text);
+              setError(null);
+            }}
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
           />
         ) : (
-          <Text style={styles.description}>Eine neue UUID wird für dieses Gerät erzeugt.</Text>
+          <Text style={styles.description}>
+            Für dieses Gerät wird eine neue userId erzeugt. Du findest sie danach in den
+            Einstellungen und kannst sie auf weiteren Geräten eintragen.
+          </Text>
         )}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text style={styles.error} accessibilityRole="alert">
+            {error}
+          </Text>
+        ) : null}
         <View style={styles.actions}>
-          <Button label="Speichern und synchronisieren" onPress={() => void handleSave()} disabled={isSaving} />
-          <Button label="Später" variant="ghost" onPress={onComplete} disabled={isSaving} />
+          <Button
+            label={isSaving ? 'Wird eingerichtet …' : 'Einrichten und synchronisieren'}
+            onPress={() => void handleSave()}
+            disabled={isSaving || (mode === 'existing' && !value.trim())}
+          />
+          <Button label="Später" variant="secondary" onPress={() => void onComplete()} disabled={isSaving} />
         </View>
       </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const MODE_OPTIONS = [
+  { value: 'existing', label: 'Vorhandene ID' },
+  { value: 'new', label: 'Neue ID' },
+] as const;
+
+const styles = themedStyles(() => ({
   overlay: {
+    position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
     left: 0,
     zIndex: 10,
     justifyContent: 'center',
-    padding: spacing.xl,
+    padding: 20,
     backgroundColor: colors.overlay,
   },
   card: {
-    gap: spacing.md,
-    padding: spacing.xl,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    gap: 14,
+    padding: 22,
+    borderRadius: 34,
+    backgroundColor: colors.sheet,
   },
-  title: { color: colors.textPrimary, fontSize: 22, fontWeight: '700' },
-  description: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  modeRow: { gap: spacing.sm },
-  actions: { gap: spacing.sm },
-  error: { color: colors.danger, fontSize: 14 },
-});
+  title: {
+    color: colors.textPrimary,
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+  },
+  description: {
+    color: colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  actions: {
+    gap: 10,
+  },
+  error: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+}));

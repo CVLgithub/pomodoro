@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
-import { radii, spacing } from '../../constants/spacing';
+import { themedStyles } from '../../theme/runtime';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -12,6 +12,8 @@ interface ButtonProps {
   variant?: ButtonVariant;
   disabled?: boolean;
   icon?: ReactNode;
+  /** Kompakte Höhe für Kopfzeilen und Zeilenaktionen. */
+  compact?: boolean;
 }
 
 export const Button = ({
@@ -20,84 +22,86 @@ export const Button = ({
   variant = 'primary',
   disabled = false,
   icon,
+  compact = false,
 }: ButtonProps) => (
   <Pressable
     accessibilityRole="button"
+    accessibilityState={{ disabled }}
     disabled={disabled}
     onPress={onPress}
     style={({ pressed }) => [
       styles.base,
-      variantStyles[variant],
+      compact ? styles.compact : null,
+      styles[variant],
       pressed && !disabled ? styles.pressed : null,
       disabled ? styles.disabled : null,
     ]}
   >
     <View style={styles.content}>
       {icon}
-      <Text style={[styles.label, labelStyles[variant]]}>{label}</Text>
+      <Text style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
     </View>
   </Pressable>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   base: {
-    minHeight: 48,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.lg,
+    minHeight: 52,
+    borderRadius: 26,
+    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
+  },
+  compact: {
+    minHeight: 44,
+    borderRadius: 22,
+    paddingHorizontal: 16,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: 8,
   },
   label: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
   pressed: {
-    opacity: 0.86,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
   },
   disabled: {
     opacity: 0.45,
   },
-});
-
-const variantStyles = StyleSheet.create({
   primary: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
   secondary: {
     backgroundColor: colors.surfaceElevated,
-    borderColor: colors.border,
+    borderColor: colors.glassLine,
   },
   ghost: {
-    backgroundColor: 'transparent',
-    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.glassLine,
   },
   danger: {
-    backgroundColor: 'rgba(255, 107, 107, 0.16)',
-    borderColor: 'rgba(255, 107, 107, 0.35)',
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.glassLine,
   },
-});
-
-const labelStyles = StyleSheet.create({
-  primary: {
-    color: colors.background,
+  primaryLabel: {
+    color: colors.onAccent,
+    fontWeight: '700',
   },
-  secondary: {
+  secondaryLabel: {
     color: colors.textPrimary,
   },
-  ghost: {
-    color: colors.textSecondary,
+  ghostLabel: {
+    color: colors.textPrimary,
   },
-  danger: {
+  dangerLabel: {
     color: colors.danger,
   },
-});
-
+}));
