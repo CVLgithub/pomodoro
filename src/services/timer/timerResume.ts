@@ -21,7 +21,8 @@ export const isTimerExpired = (
   );
 };
 
-const buildFocusSession = (
+/** Baut aus dem Timer-Zustand die zu speichernde Session; `null`, wenn keine volle Minute lief. */
+export const buildFocusSession = (
   state: TimerStateRecord,
   task: Task | null,
   endedAt: string,
@@ -44,16 +45,3 @@ const buildFocusSession = (
     syncStatus: 'pending',
   };
 };
-
-export const buildCompletedFocusSession = (
-  state: TimerStateRecord,
-  task: Task | null,
-  completedAt: string,
-): CreateSessionInput | null => buildFocusSession(state, task, completedAt);
-
-export const buildTrackedFocusSession = (
-  state: TimerStateRecord,
-  task: Task | null,
-  endedAt: string,
-): CreateSessionInput | null =>
-  buildFocusSession(state, task, endedAt);

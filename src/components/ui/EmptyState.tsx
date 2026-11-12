@@ -1,8 +1,9 @@
 import { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
+import { themedStyles } from '../../theme/runtime';
 
 interface EmptyStateProps {
   title: string;
@@ -18,13 +19,10 @@ export const EmptyState = ({ title, description, icon }: EmptyStateProps) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
-    padding: spacing.xl,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
     gap: spacing.sm,
   },
@@ -40,5 +38,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-});
+}));
 

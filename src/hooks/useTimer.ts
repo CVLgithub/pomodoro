@@ -11,6 +11,7 @@ export const useTimer = () => {
     status: state.status,
     expectedEndAt: state.expectedEndAt,
     pausedRemainingSeconds: state.pausedRemainingSeconds,
+    extraSeconds: state.extraSeconds,
     focusMinutes: state.focusMinutes,
     shortBreakMinutes: state.shortBreakMinutes,
     longBreakMinutes: state.longBreakMinutes,
@@ -48,14 +49,18 @@ export const useTimer = () => {
       ...timerState,
     };
     const remainingSeconds = timerEngine.getRemainingSeconds(baseTimerState, effectiveNow);
-    const totalSeconds = timerEngine.getDurationSeconds(baseTimerState, timerState.activeMode);
+    const totalSeconds =
+      timerState.status === 'idle'
+        ? timerEngine.getDurationSeconds(baseTimerState, timerState.activeMode)
+        : timerEngine.getSessionSeconds(baseTimerState);
 
     return {
       ...timerState,
       now: effectiveNow,
       remainingSeconds,
       totalSeconds,
-      progress: totalSeconds === 0 ? 0 : 1 - remainingSeconds / totalSeconds,
+      progress:
+        totalSeconds === 0 ? 0 : Math.min(1, Math.max(0, 1 - remainingSeconds / totalSeconds)),
       formattedRemaining: formatDurationClock(remainingSeconds),
     };
   }, [effectiveNow, timerState]);

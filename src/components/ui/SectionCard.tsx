@@ -2,8 +2,7 @@ import { ReactNode } from 'react';
 import type { ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { colors } from '../../constants/colors';
-import { radii, spacing } from '../../constants/spacing';
+import { Glass } from './Glass';
 
 export const SectionCard = ({
   children,
@@ -11,15 +10,15 @@ export const SectionCard = ({
 }: {
   children: ReactNode;
   style?: ComponentProps<typeof View>['style'];
-}) => <View style={[styles.card, style]}>{children}</View>;
+}) => (
+  <Glass radius={26} style={[styles.card, style]}>
+    {children}
+  </Glass>
+);
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    gap: spacing.md,
+    padding: 16,
+    gap: 12,
   },
 });

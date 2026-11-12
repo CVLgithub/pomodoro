@@ -9,11 +9,7 @@ import { getTaskById } from '../db/repositories/tasksRepository';
 import { getTimerState, saveTimerState } from '../db/repositories/timerStateRepository';
 import { syncManager } from '../services/sync/syncManager';
 import { toSessionPushPayload } from '../services/sync/payloads';
-import {
-  buildCompletedFocusSession,
-  buildTrackedFocusSession,
-  isTimerExpired,
-} from '../services/timer/timerResume';
+import { buildFocusSession, isTimerExpired } from '../services/timer/timerResume';
 import { timerEngine } from '../services/timer/timerEngine';
 import { TimerMode, TimerStateRecord } from '../types/timer';
 import { getTodayDateKey, toLocalIsoString } from '../utils/date';
@@ -40,6 +36,7 @@ interface TimerStoreState extends TimerStateRecord {
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   reset: () => Promise<void>;
+  extend: (minutes: number) => Promise<void>;
   finishNow: () => Promise<void>;
   reconcileWithClock: () => Promise<void>;
   handleDeletedTask: (taskId: string) => Promise<void>;
@@ -116,6 +113,22 @@ const maybeNotifyDailyFocusGoalReached = async (sessionDurationMinutes: number):
 
   await notificationService.sendDailyGoalReachedNotification(targetHours);
   await saveDailyFocusGoalNotifiedDate(todayKey);
+};
+
+/** Speichert die Fokuszeit einer beendeten Session und stößt Statistik, Tagesziel und Sync an. */
+const recordFocusSession = async (state: TimerStateRecord, endedAt: string): Promise<void> => {
+  const task = state.selectedTaskId ? await getTaskById(state.selectedTaskId) : null;
+  const sessionInput = buildFocusSession(state, task, endedAt);
+
+  if (!sessionInput) {
+    return;
+  }
+
+  const createdSession = await createSession(sessionInput);
+  await maybeNotifyDailyFocusGoalReached(createdSession.durationMinutes);
+  await useSessionsStore.getState().loadSessions();
+  await swallowSyncError(syncManager.pushSession(toSessionPushPayload(createdSession)));
+  await useSyncStore.getState().loadQueue();
 };
 
 export const useTimerStore = create<TimerStoreState>((set, get) => ({
@@ -260,6 +273,24 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       timerEngine.getRemainingSeconds(nextState),
     );
   },
+  extend: async (minutes) => {
+    const current = get();
+
+    if (current.status === 'idle' || minutes <= 0) {
+      return;
+    }
+
+    const nextState = timerEngine.extend(current, Math.round(minutes * 60));
+    const persisted = await saveTimerState(stripUpdatedAt(nextState));
+    set({ ...persisted });
+
+    if (nextState.status === 'running') {
+      await syncTimerCompletionNotification(
+        nextState.activeMode,
+        timerEngine.getRemainingSeconds(nextState),
+      );
+    }
+  },
   reset: async () => {
     const persisted = await saveTimerState(stripUpdatedAt(timerEngine.reset(get())));
     set({ ...persisted });
@@ -290,20 +321,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       return;
     }
 
-    const task = current.selectedTaskId
-      ? await getTaskById(current.selectedTaskId)
-      : null;
-    const sessionInput = buildTrackedFocusSession(current, task, endedAt);
-
-    if (!sessionInput) {
-      return;
-    }
-
-    const createdSession = await createSession(sessionInput);
-    await maybeNotifyDailyFocusGoalReached(createdSession.durationMinutes);
-    await useSessionsStore.getState().loadSessions();
-    await swallowSyncError(syncManager.pushSession(toSessionPushPayload(createdSession)));
-    await useSyncStore.getState().loadQueue();
+    await recordFocusSession(current, endedAt);
   },
   reconcileWithClock: async () => {
     const current = get();
@@ -321,40 +339,17 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     set({ ...nextState });
     await notificationService.cancelTimerCompletionNotification();
 
-    if (completion.completedMode === 'focus') {
-      const task = current.selectedTaskId
-        ? await getTaskById(current.selectedTaskId)
-        : null;
-      const sessionInput = buildCompletedFocusSession(
-        current,
-        task,
-        completion.completedAt,
-      );
-      const persisted = await saveTimerState(stripUpdatedAt(nextState));
-      if (requestId !== completionRequestId) {
-        return;
-      }
-
-      set({ ...persisted });
-
-      if (!sessionInput) {
-        return;
-      }
-
-      const createdSession = await createSession(sessionInput);
-      await maybeNotifyDailyFocusGoalReached(createdSession.durationMinutes);
-      await useSessionsStore.getState().loadSessions();
-      await swallowSyncError(syncManager.pushSession(toSessionPushPayload(createdSession)));
-      await useSyncStore.getState().loadQueue();
-      return;
-    }
-
     const persisted = await saveTimerState(stripUpdatedAt(nextState));
+
     if (requestId !== completionRequestId) {
       return;
     }
 
     set({ ...persisted });
+
+    if (completion.completedMode === 'focus') {
+      await recordFocusSession(current, completion.completedAt);
+    }
   },
   handleDeletedTask: async (taskId) => {
     const current = get();

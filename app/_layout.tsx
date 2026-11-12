@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -10,22 +10,21 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { colors } from '../src/constants/colors';
 import { initializeDatabase } from '../src/db/client';
 import { useAppResume } from '../src/hooks/useAppResume';
-import { downsyncEntries } from '../src/services/sync/downsyncService';
 import { getEntriesRequestUrl } from '../src/services/api/entriesService';
-import { saveLastSyncError, saveLastSyncSuccess } from '../src/db/repositories/settingsRepository';
-import { useSessionsStore } from '../src/store/sessionsStore';
+import { reloadStores, syncAndReload } from '../src/services/sync/fullSync';
 import { useSettingsStore } from '../src/store/settingsStore';
-import { useSyncStore } from '../src/store/syncStore';
-import { useTagsStore } from '../src/store/tagsStore';
-import { useTasksStore } from '../src/store/tasksStore';
 import { useStopwatchStore } from '../src/store/stopwatchStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { useUiStore } from '../src/store/uiStore';
 import { UserIdOnboarding } from '../src/components/settings/UserIdOnboarding';
+import { themedStyles } from '../src/theme/runtime';
 
-const runAutomaticDownsync = async (): Promise<void> => {
-  await downsyncEntries();
-  await saveLastSyncSuccess(new Date().toISOString());
+const runAutomaticSync = async (reason: string): Promise<void> => {
+  const result = await syncAndReload();
+
+  if (!result.ok) {
+    console.warn(`Automatic sync failed (${reason})`, getEntriesRequestUrl(), result.message);
+  }
 };
 
 export default function RootLayout() {
@@ -35,6 +34,7 @@ export default function RootLayout() {
   const setBootstrapped = useUiStore((state) => state.setBootstrapped);
   const userId = useSettingsStore((state) => state.userId);
   const isDevUserId = useSettingsStore((state) => state.isDevUserId);
+  const theme = useSettingsStore((state) => state.theme);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   useEffect(() => {
@@ -43,24 +43,10 @@ export default function RootLayout() {
     const bootstrap = async () => {
       try {
         await initializeDatabase();
-        await useSettingsStore.getState().loadSettings();
-        try {
-          await runAutomaticDownsync();
-        } catch (error) {
-          await saveLastSyncError(error instanceof Error ? error.message : 'Unbekannter Fehler');
-          console.warn(
-            'Automatic downsync failed during bootstrap',
-            getEntriesRequestUrl(),
-            error instanceof Error ? error.message : error,
-          );
-        }
-        await useSettingsStore.getState().loadSettings();
-        await Promise.all([
-          useTagsStore.getState().loadTags(),
-          useTasksStore.getState().loadTasks(),
-          useSessionsStore.getState().loadSessions(),
-          useSyncStore.getState().loadQueue(),
-        ]);
+        // Lokal zuerst: Die App startet mit dem lokalen Stand und gleicht
+        // danach im Hintergrund ab, damit ein langsames oder nicht erreichbares
+        // Backend den Start nicht aufhält.
+        await reloadStores();
         await useTimerStore.getState().hydrate();
         await useStopwatchStore.getState().hydrate();
         await useTimerStore.getState().reconcileWithClock();
@@ -68,6 +54,8 @@ export default function RootLayout() {
         if (isMounted) {
           setBootstrapped(true);
         }
+
+        void runAutomaticSync('bootstrap');
       } catch (error) {
         if (isMounted) {
           setErrorMessage(error instanceof Error ? error.message : 'Bootstrap failed');
@@ -91,25 +79,8 @@ export default function RootLayout() {
         : null);
 
   useAppResume(async () => {
-    try {
-      await runAutomaticDownsync();
-    } catch (error) {
-      await saveLastSyncError(error instanceof Error ? error.message : 'Unbekannter Fehler');
-      console.warn(
-        'Automatic downsync failed on resume',
-        getEntriesRequestUrl(),
-        error instanceof Error ? error.message : error,
-      );
-    }
-
+    await runAutomaticSync('resume');
     await useTimerStore.getState().reconcileWithClock();
-    await Promise.all([
-      useSettingsStore.getState().loadSettings(),
-      useSessionsStore.getState().loadSessions(),
-      useSyncStore.getState().loadQueue(),
-      useTasksStore.getState().loadTasks(),
-      useTagsStore.getState().loadTags(),
-    ]);
   });
 
   if (startupErrorMessage) {
@@ -131,7 +102,9 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={styles.root}>
+    // Der key baut den Baum nach einem Wechsel der Farbwelt neu auf, damit alle
+    // Komponenten ihre Styles in den neuen Farben lesen.
+    <GestureHandlerRootView key={theme} style={styles.root}>
       <Stack
         screenOptions={{
           headerShown: false,
@@ -139,9 +112,12 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="stats-chart" />
-        <Stack.Screen name="settings" />
         <Stack.Screen name="downsync" />
+        <Stack.Screen name="prefs/notifications" />
+        <Stack.Screen name="prefs/tags" />
+        <Stack.Screen name="prefs/deleted-sessions" />
+        <Stack.Screen name="prefs/sync-queue" />
+        <Stack.Screen name="prefs/connection" />
         <Stack.Screen name="task/[id]" />
         <Stack.Screen name="tag/[id]" />
       </Stack>
@@ -157,7 +133,7 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   root: {
     flex: 1,
   },
@@ -184,4 +160,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-});
+}));

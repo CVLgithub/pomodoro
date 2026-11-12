@@ -1,8 +1,9 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 
 import { colors } from '../../constants/colors';
-import { radii, spacing } from '../../constants/spacing';
+import { getActiveThemeName } from '../../theme/runtime';
+import { Glass } from '../ui/Glass';
 
 interface CalendarMonthCardProps {
   selectedDate: string;
@@ -19,9 +20,12 @@ export const CalendarMonthCard = ({
   onSelectDate,
   onChangeVisibleMonth,
 }: CalendarMonthCardProps) => (
-  <View style={styles.container}>
+  <Glass radius={30} style={styles.container}>
     <Calendar
+      // Der Kalender übernimmt sein Farbschema nur beim Einhängen.
+      key={getActiveThemeName()}
       current={visibleMonthDate}
+      firstDay={1}
       markedDates={{
         ...markedDates,
         [selectedDate]: {
@@ -32,33 +36,34 @@ export const CalendarMonthCard = ({
       onDayPress={(day: DateData) => onSelectDate(day.dateString)}
       onMonthChange={(month: DateData) => onChangeVisibleMonth(month.dateString)}
       theme={{
-        backgroundColor: colors.surface,
-        calendarBackground: colors.surface,
-        textSectionTitleColor: colors.textMuted,
+        backgroundColor: 'transparent',
+        calendarBackground: 'transparent',
+        textSectionTitleColor: colors.textSecondary,
         selectedDayBackgroundColor: colors.accent,
-        selectedDayTextColor: colors.background,
-        todayTextColor: colors.accent,
+        selectedDayTextColor: colors.onAccent,
+        selectedDotColor: colors.onAccent,
+        todayTextColor: colors.textPrimary,
         dayTextColor: colors.textPrimary,
         monthTextColor: colors.textPrimary,
-        arrowColor: colors.accent,
-        textDisabledColor: '#394150',
+        arrowColor: colors.textPrimary,
+        textDisabledColor: colors.textMuted,
+        textDayFontSize: 17,
+        textMonthFontSize: 17,
+        textMonthFontWeight: '700',
+        textDayHeaderFontSize: 12,
+        textDayHeaderFontWeight: '600',
       }}
       style={styles.calendar}
       enableSwipeMonths
     />
-  </View>
+  </Glass>
 );
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: radii.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: spacing.sm,
+    padding: 8,
   },
   calendar: {
-    borderRadius: radii.lg,
+    backgroundColor: 'transparent',
   },
 });

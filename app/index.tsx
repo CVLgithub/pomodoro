@@ -6,7 +6,6 @@ import { useSettingsStore } from '../src/store/settingsStore';
 const startPageRoutes: Record<StartPage, Href> = {
   today: '/(tabs)/today',
   timer: '/(tabs)/timer',
-  calendar: '/(tabs)/calendar',
   tasks: '/(tabs)/tasks',
   stats: '/(tabs)/stats',
 };

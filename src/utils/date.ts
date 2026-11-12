@@ -113,3 +113,13 @@ export const isDateWithinRange = (
   const value = parseDateKey(dateKey);
   return value.getTime() >= start.getTime() && value.getTime() <= end.getTime();
 };
+
+const shortDateFormatter = new Intl.DateTimeFormat('de-DE', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
+/** Kurzes Datum für Listen, z. B. "Fr., 13. Nov.". */
+export const formatShortDateLabel = (dateKey: string): string =>
+  shortDateFormatter.format(parseDateKey(dateKey));

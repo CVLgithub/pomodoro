@@ -2,11 +2,21 @@
 
 ## 1. Architekturuebersicht
 
-- Expo Router fuer Navigation mit 5 Haupttabs und Detail-Screens.
+- Expo Router fuer Navigation mit 5 Tabs (Stoppuhr, Timer, Aufgaben, Statistik, Einstellungen) und Detail-Screens.
 - SQLite (`expo-sqlite`) als primaere Datenquelle fuer Tasks, Tags, Sessions, Sync-Queue und Timer-State.
-- Zustand fuer modulare Stores (`tasks`, `tags`, `sessions`, `timer`, `sync`, `ui`).
+- Zustand fuer modulare Stores (`tasks`, `tags`, `sessions`, `timer`, `stopwatch`, `sync`, `settings`, `ui`).
 - Push- und Downsync ueber `fetch`: lokale Aenderungen werden ueber die Sync-Queue an das Backend gesendet, gespeicherte Eintraege koennen ueber `/entries` zurueckgeladen werden.
 - Timer mit persistiertem State, Resume-basierter Restzeitberechnung und lokaler Session-Speicherung.
+- Vier Farbwelten (Nebel als Standard, Graphit, Glut, Wald), waehlbar unter Einstellungen > App > Darstellung und nur lokal gespeichert.
+- Glasflaechen ueber `expo-glass-effect`: natives Liquid Glass ab iOS 26, sonst eine halbtransparente Ersatzdarstellung (im Web mit `backdrop-filter`).
+
+### Design-System
+
+- `src/theme/palettes.ts`: die vier Farbwelten mit allen Farb-Tokens.
+- `src/theme/runtime.ts`: aktive Farbwelt und `themedStyles(() => ({...}))` als Ersatz fuer `StyleSheet.create` auf Modulebene.
+- `src/constants/colors.ts`: `colors.*` liest immer die aktive Farbwelt. Nur zur Renderzeit oder in `themedStyles` lesen.
+- Nach einem Wechsel der Farbwelt baut `app/_layout.tsx` den Baum ueber `key={theme}` neu auf.
+- Bausteine in `src/components/ui/`: `Glass`, `Backdrop`, `Screen`/`ScreenShell`, `GlassTabBar`, `Segmented`, `CircleButton`, `Button`, `TagChips`, `ModalSheet`, `TextField`.
 
 ## 2. Verwendete Pakete mit Installationsbefehlen
 
@@ -31,14 +41,20 @@ app/
     _layout.tsx
     today.tsx
     timer.tsx
-    calendar.tsx
     tasks.tsx
     stats.tsx
+    settings.tsx
+  prefs/
+    notifications.tsx
+    tags.tsx
+    deleted-sessions.tsx
+    sync-queue.tsx
+    connection.tsx
   task/
     [id].tsx
   tag/
     [id].tsx
-  settings.tsx
+  downsync.tsx
 
 src/
   components/
@@ -88,6 +104,8 @@ src/
     uiStore.ts
   theme/
     index.ts
+    palettes.ts
+    runtime.ts
   types/
     api.ts
     settings.ts
@@ -106,9 +124,9 @@ src/
 ## 4. Zentrale Dateien
 
 - `app/_layout.tsx`: App-Bootstrap, DB-Initialisierung, Store-Hydration, Resume-Refresh.
-- `app/(tabs)/timer.tsx`: Timer-UI, Moduswahl, Wheel-Picker, Session-Zuordnung.
+- `app/(tabs)/timer.tsx`: Timer-UI, Modus und Dauer, Session-Zuordnung, Verlaengerung.
 - `src/store/timerStore.ts`: Persistenter Timer-State, Resume-Abschluss, Session-Erzeugung.
-- `src/services/timer/timerEngine.ts`: Reine Timer-Logik fuer Start/Pause/Resume/Reset/Complete.
+- `src/services/timer/timerEngine.ts`: Reine Timer-Logik fuer Start/Pause/Resume/Extend/Reset/Complete.
 - `src/services/sync/syncManager.ts`: Queue-Eintrag anlegen, Push ausfuehren, Status aktualisieren und fehlgeschlagene Eintraege erneut senden.
 - `src/services/sync/downsyncService.ts`: Eintraege ueber `/entries` laden und mit der lokalen SQLite-Datenbank abgleichen.
 
@@ -152,13 +170,22 @@ src/
 
 ## 10. Screens und zentrale UI-Komponenten
 
-- `today.tsx`: Tagesfokus, Schnellanlage, Timer-Sprung, heutige Fokuszeit.
-- `timer.tsx`: Modus, Dauer, Task-/Tag-Zuordnung vor, waehrend und nach Sessions.
-- `calendar.tsx`: Monatsansicht, Tagwahl, geplante Aufgaben pro Datum.
-- `tasks.tsx`: offene und erledigte Aufgaben, gruppiert nach Tags.
-- `stats.tsx`: Tagesgruppen abgeschlossener Fokus-Sessions plus Summenkarten.
-- `settings.tsx`: Backend-Hinweis, Tag-Verwaltung, Sync-Queue mit JSON-Ansicht und Retry.
+- `today.tsx` (Stoppuhr): Zeit gross in der Mitte, Zuordnung und Bedienung in einer Glasflaeche, heutige Fokuszeit im Kopf.
+- `timer.tsx`: gleicher Aufbau; Modus und Dauer in einem gemeinsamen Blatt, `+5` verlaengert eine laufende oder pausierte Session.
+- `tasks.tsx`: Liste nach Faelligkeit (Ueberfaellig, Heute, Demnaechst, Wiederkehrend, Ohne Datum, Erledigt) mit Tag-Filter; der Kalender ist eine zweite Ansicht im selben Tab.
+- `stats.tsx`: Zeitraum (Tag, Woche, Monat, Gesamt), Summe, Balkendiagramm, Verteilung nach Tags, Sessions zum Bearbeiten; `+` traegt eine vergangene Session nach.
+- `settings.tsx`: Darstellung, Startseite, Pausenwechsel, Synchronisieren und Verweise auf die Unterseiten.
+- `prefs/notifications.tsx`, `prefs/tags.tsx`, `prefs/deleted-sessions.tsx`, `prefs/sync-queue.tsx`, `prefs/connection.tsx`: Unterseiten der Einstellungen.
+- `task/[id].tsx`: Aufgabe bearbeiten; Tag als Chips, Datum mit Schnellauswahl, woechentliche Wiederholung, "Im Timer verwenden".
+- `tag/[id].tsx`: Tag bearbeiten. Tags werden nur hier angelegt, Gruppen nur ueber `NewGroupSheet`.
 - `downsync.tsx`: Manueller Abruf und Abgleich der Eintraege vom Backend.
+
+### Gemeinsame Logik
+
+- `src/services/sync/fullSync.ts`: `syncAndReload()` fuer Start, Rueckkehr in die App, Onboarding und den Knopf in den Einstellungen.
+- `src/services/notifications/applyPreferences.ts`: speichert Benachrichtigungs-Einstellungen inklusive Berechtigung und laufendem Timer.
+- `src/utils/stats.ts`, `src/utils/sessionInput.ts`: Auswertung der Statistik und Pruefung nachgetragener Sessions (mit Tests).
+- `src/constants/routes.ts`: alle Routen an einer Stelle.
 
 ## 11. Startanleitung
 
@@ -191,9 +218,9 @@ gepusht. Unterstuetzte Push-Endpunkte sind:
 - `POST /push/task`
 - `POST /push/session`
 
-Beim App-Start, beim Zurueckkehren in die App und ueber den Downsync-Screen kann der Bestand
-mit `GET /entries` vom Backend geladen und lokal eingepflegt werden. Der automatische Downsync
-laedt beim App-Start den gesamten Bestand und aktualisiert beim Zurueckkehren offene Tasks.
+Die App startet immer mit dem lokalen Stand und gleicht danach im Hintergrund ab. Beim
+App-Start, beim Zurueckkehren in die App und ueber "Jetzt synchronisieren" wird der gesamte
+Bestand mit `GET /entries` geladen und lokal eingepflegt.
 Fehlerhafte Pushes bleiben in der Queue und koennen in den Einstellungen erneut versucht werden.
 
 ## 13. Sinnvolle naechste Schritte

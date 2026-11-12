@@ -19,6 +19,7 @@ import {
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
+import { themedStyles } from '../../theme/runtime';
 
 type ModalSheetSwipeAreaProps = {
   children: ReactNode;
@@ -210,7 +211,7 @@ export const ModalSheet = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   modalRoot: {
     flex: 1,
   },
@@ -220,9 +221,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.overlay,
   },
   sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.xl,
-    borderTopRightRadius: radii.xl,
+    backgroundColor: colors.sheet,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing['3xl'],
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: radii.pill,
-    backgroundColor: colors.border,
+    backgroundColor: colors.track,
   },
   header: {
     flexDirection: 'row',
@@ -249,8 +250,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   close: {
-    color: colors.accent,
+    color: colors.textPrimary,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-});
+}));
