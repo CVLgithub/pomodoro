@@ -17,6 +17,7 @@ import { useStopwatchStore } from '../src/store/stopwatchStore';
 import { useTimerStore } from '../src/store/timerStore';
 import { useUiStore } from '../src/store/uiStore';
 import { UserIdOnboarding } from '../src/components/settings/UserIdOnboarding';
+import { sheetScreenOptions } from '../src/components/ui/sheetScreenOptions';
 import { themedStyles } from '../src/theme/runtime';
 
 const runAutomaticSync = async (reason: string): Promise<void> => {
@@ -101,6 +102,8 @@ export default function RootLayout() {
     );
   }
 
+  const sheetOptions = sheetScreenOptions();
+
   return (
     // Der key baut den Baum nach einem Wechsel der Farbwelt neu auf, damit alle
     // Komponenten ihre Styles in den neuen Farben lesen.
@@ -120,6 +123,13 @@ export default function RootLayout() {
         <Stack.Screen name="prefs/connection" />
         <Stack.Screen name="task/[id]" />
         <Stack.Screen name="tag/[id]" />
+        {/* Sheets. `dangerouslySingular` verhindert, dass ein Doppeltipp dasselbe
+            Sheet zweimal übereinander öffnet. */}
+        <Stack.Screen name="sheet/assignment" options={sheetOptions} dangerouslySingular />
+        <Stack.Screen name="sheet/timer-mode" options={sheetOptions} dangerouslySingular />
+        <Stack.Screen name="sheet/manual-session" options={sheetOptions} dangerouslySingular />
+        <Stack.Screen name="sheet/session/[id]" options={sheetOptions} dangerouslySingular />
+        <Stack.Screen name="sheet/new-group" options={sheetOptions} dangerouslySingular />
       </Stack>
       {!userId && !isDevUserId && !onboardingDismissed ? (
         <UserIdOnboarding

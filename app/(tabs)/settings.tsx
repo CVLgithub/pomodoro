@@ -1,20 +1,23 @@
-import { useState } from 'react';
-import { Alert } from 'react-native';
+import { useRef, useState } from 'react';
+import type { ComponentRef } from 'react';
+import { Alert, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { ThemePicker } from '../../src/components/settings/ThemePicker';
-import { ChoiceChips } from '../../src/components/ui/ChoiceChips';
+import { DropdownMenu, MenuAnchor } from '../../src/components/ui/DropdownMenu';
 import { ListGroup, ListRow, ToggleRow } from '../../src/components/ui/List';
-import { ModalSheet } from '../../src/components/ui/ModalSheet';
 import { Screen } from '../../src/components/ui/Screen';
 import { SectionCard } from '../../src/components/ui/SectionCard';
 import { SectionHeader } from '../../src/components/ui/SectionHeader';
+import { colors } from '../../src/constants/colors';
 import { routes } from '../../src/constants/routes';
 import { syncAndReload } from '../../src/services/sync/fullSync';
 import { useSessionsStore } from '../../src/store/sessionsStore';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useSyncStore } from '../../src/store/syncStore';
 import { useTagsStore } from '../../src/store/tagsStore';
+import { themedStyles } from '../../src/theme/runtime';
 import { START_PAGE_OPTIONS } from '../../src/types/settings';
 import { formatDateKey, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
 
@@ -29,7 +32,8 @@ const formatSyncMoment = (isoValue: string): string => {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const [startPageSheetVisible, setStartPageSheetVisible] = useState(false);
+  const startPageRow = useRef<ComponentRef<typeof View>>(null);
+  const [startPageMenuAnchor, setStartPageMenuAnchor] = useState<MenuAnchor | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const tagCount = useTagsStore((state) => state.tags.length);
   const deletedSessionCount = useSessionsStore((state) => state.deletedSessions.length);
@@ -80,11 +84,25 @@ export default function SettingsScreen() {
       </SectionCard>
 
       <ListGroup>
-        <ListRow
-          label="Startseite"
-          value={START_PAGE_OPTIONS.find((option) => option.value === startPage)?.label}
-          onPress={() => setStartPageSheetVisible(true)}
-        />
+        {/* collapsable={false} hält die View nativ erhalten, damit sie sich messen lässt. */}
+        <View ref={startPageRow} collapsable={false}>
+          <ListRow
+            label="Startseite"
+            onPress={() =>
+              startPageRow.current?.measureInWindow((x, y, width, height) =>
+                setStartPageMenuAnchor({ x, y, width, height }),
+              )
+            }
+            right={
+              <View style={styles.menuValue}>
+                <Text style={styles.menuValueText} numberOfLines={1}>
+                  {START_PAGE_OPTIONS.find((option) => option.value === startPage)?.label}
+                </Text>
+                <Ionicons name="chevron-expand" size={16} color={colors.textSecondary} />
+              </View>
+            }
+          />
+        </View>
         <ListRow
           label="Benachrichtigungen"
           value={notificationsOn ? 'Ein' : 'Aus'}
@@ -147,21 +165,28 @@ export default function SettingsScreen() {
         />
       </ListGroup>
 
-      <ModalSheet
-        visible={startPageSheetVisible}
-        title="Startseite"
-        onClose={() => setStartPageSheetVisible(false)}
-        swipeToClose
-      >
-        <ChoiceChips
-          options={START_PAGE_OPTIONS}
-          selected={[startPage]}
-          onToggle={(value) => {
-            setStartPageSheetVisible(false);
-            void saveStartPage(value).catch(reportError('Startseite konnte nicht gespeichert werden'));
-          }}
-        />
-      </ModalSheet>
+      <DropdownMenu
+        anchor={startPageMenuAnchor}
+        options={START_PAGE_OPTIONS}
+        selected={startPage}
+        onClose={() => setStartPageMenuAnchor(null)}
+        onSelect={(value) => {
+          setStartPageMenuAnchor(null);
+          void saveStartPage(value).catch(reportError('Startseite konnte nicht gespeichert werden'));
+        }}
+      />
     </Screen>
   );
 }
+
+const styles = themedStyles(() => ({
+  menuValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  menuValueText: {
+    color: colors.textSecondary,
+    fontSize: 16,
+  },
+}));

@@ -1,23 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { ManualSessionSheet } from '../../src/components/stats/ManualSessionSheet';
 import { Button } from '../../src/components/ui/Button';
 import { CircleButton } from '../../src/components/ui/CircleButton';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { Glass } from '../../src/components/ui/Glass';
-import { ModalSheet } from '../../src/components/ui/ModalSheet';
 import { Screen } from '../../src/components/ui/Screen';
 import { Segmented } from '../../src/components/ui/Segmented';
-import { TagChips } from '../../src/components/ui/TagChips';
-import { TextField } from '../../src/components/ui/TextField';
 import { colors } from '../../src/constants/colors';
+import { routes } from '../../src/constants/routes';
+import { useOpenSheet } from '../../src/hooks/useSheet';
 import { useSessionsStore } from '../../src/store/sessionsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { themedStyles } from '../../src/theme/runtime';
-import { Session } from '../../src/types/session';
-import { confirmAction } from '../../src/utils/confirm';
 import { formatShortDateLabel, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
 import {
   StatsPeriod,
@@ -38,21 +34,19 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 const BAR_AREA_HEIGHT = 88;
+
+/** Kurzform für die schmalen Monatsbalken, z. B. `12h` oder `45m`. */
+const formatBarHours = (minutes: number): string =>
+  minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`;
 const SESSION_LIMIT = 30;
 
 export default function StatsScreen() {
+  const openSheet = useOpenSheet();
   const sessions = useSessionsStore((state) => state.sessions);
-  const updateSessionEntry = useSessionsStore((state) => state.updateSessionEntry);
-  const deleteSessionEntry = useSessionsStore((state) => state.deleteSessionEntry);
   const tags = useTagsStore((state) => state.tags);
   const [period, setPeriod] = useState<StatsPeriod>('week');
   const [anchor, setAnchor] = useState(() => new Date());
   const [showAllSessions, setShowAllSessions] = useState(false);
-  const [manualSheetVisible, setManualSheetVisible] = useState(false);
-  const [editedSession, setEditedSession] = useState<Session | null>(null);
-  const [titleInput, setTitleInput] = useState('');
-  const [tagInput, setTagInput] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
   const todayKey = getTodayDateKey();
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
@@ -80,58 +74,6 @@ export default function StatsScreen() {
     setShowAllSessions(false);
   };
 
-  const openEditor = (session: Session) => {
-    setEditedSession(session);
-    setTitleInput(session.title);
-    setTagInput(session.tagId);
-  };
-
-  const closeEditor = () => {
-    setEditedSession(null);
-    setIsSaving(false);
-  };
-
-  const saveSession = async () => {
-    if (!editedSession || !titleInput.trim() || !tagInput || isSaving) {
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      await updateSessionEntry(editedSession.id, { title: titleInput, tagId: tagInput });
-      closeEditor();
-    } catch (error) {
-      Alert.alert(
-        'Session konnte nicht gespeichert werden',
-        error instanceof Error ? error.message : 'Unbekannter Fehler',
-      );
-      setIsSaving(false);
-    }
-  };
-
-  const deleteSession = async (session: Session) => {
-    const confirmed = await confirmAction({
-      title: 'Session löschen?',
-      message: `„${session.title}“ wird aus der Statistik entfernt. Unter Einstellungen › Sync lässt sie sich wiederherstellen.`,
-      confirmLabel: 'Löschen',
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await deleteSessionEntry(session.id);
-      closeEditor();
-    } catch (error) {
-      Alert.alert(
-        'Session konnte nicht gelöscht werden',
-        error instanceof Error ? error.message : 'Unbekannter Fehler',
-      );
-    }
-  };
-
   return (
     <Screen
       title="Statistik"
@@ -140,7 +82,7 @@ export default function StatsScreen() {
           icon="add"
           label="Session nachtragen"
           variant="primary"
-          onPress={() => setManualSheetVisible(true)}
+          onPress={() => openSheet(routes.manualSessionSheet)}
         />
       }
     >
@@ -204,11 +146,15 @@ export default function StatsScreen() {
         >
           {bars.map((bar) => (
             <View key={bar.key} style={styles.barColumn}>
-              {bars.length <= 12 ? (
+              {period === 'month' ? null : (
                 <Text style={styles.barValue} numberOfLines={1}>
-                  {bar.minutes > 0 ? formatHoursClock(bar.minutes) : ''}
+                  {bar.minutes === 0
+                    ? ''
+                    : period === 'all'
+                      ? formatBarHours(bar.minutes)
+                      : formatHoursClock(bar.minutes)}
                 </Text>
-              ) : null}
+              )}
               <View style={styles.barArea}>
                 <View
                   style={[
@@ -219,7 +165,14 @@ export default function StatsScreen() {
                   ]}
                 />
               </View>
-              <Text style={[styles.barLabel, bar.isCurrent ? styles.barLabelCurrent : null]}>
+              <Text
+                style={[
+                  styles.barLabel,
+                  period === 'all' ? styles.barLabelDense : null,
+                  bar.isCurrent ? styles.barLabelCurrent : null,
+                ]}
+                numberOfLines={1}
+              >
                 {bar.label}
               </Text>
             </View>
@@ -272,7 +225,7 @@ export default function StatsScreen() {
                   key={session.id}
                   accessibilityRole="button"
                   accessibilityHint="Session bearbeiten"
-                  onPress={() => openEditor(session)}
+                  onPress={() => openSheet(routes.sessionSheet(session.id))}
                   style={[styles.sessionRow, index > 0 ? styles.separated : null]}
                 >
                   <View style={[styles.dot, { backgroundColor: tag?.color ?? colors.textMuted }]} />
@@ -299,56 +252,6 @@ export default function StatsScreen() {
           ) : null}
         </View>
       )}
-
-      <ManualSessionSheet
-        visible={manualSheetVisible}
-        tags={tags}
-        onClose={() => setManualSheetVisible(false)}
-      />
-
-      <ModalSheet
-        visible={Boolean(editedSession)}
-        title="Session bearbeiten"
-        onClose={closeEditor}
-        swipeToClose
-      >
-        {editedSession ? (
-          <Text style={styles.editorMeta}>
-            {formatShortDateLabel(editedSession.date)} · {formatTimeLabel(editedSession.startTime)}–
-            {formatTimeLabel(editedSession.endTime)} · {formatHoursClock(editedSession.durationMinutes)} Std.
-          </Text>
-        ) : null}
-        <TextField
-          label="Name"
-          value={titleInput}
-          onChangeText={setTitleInput}
-          placeholder="Session benennen"
-        />
-        <View style={styles.editorTags}>
-          <Text style={styles.sectionTitle}>Tag</Text>
-          <TagChips tags={tags} selectedTagId={tagInput} onSelect={setTagInput} />
-        </View>
-        <View style={styles.editorActions}>
-          <View style={styles.editorAction}>
-            <Button
-              label="Löschen"
-              variant="danger"
-              onPress={() => {
-                if (editedSession) {
-                  void deleteSession(editedSession);
-                }
-              }}
-            />
-          </View>
-          <View style={styles.editorAction}>
-            <Button
-              label="Sichern"
-              onPress={() => void saveSession()}
-              disabled={!titleInput.trim() || !tagInput || isSaving}
-            />
-          </View>
-        </View>
-      </ModalSheet>
     </Screen>
   );
 }
@@ -404,7 +307,11 @@ const styles = themedStyles(() => ({
     alignItems: 'center',
     gap: 6,
   },
+  // Wert und Beschriftung sind breiter als ein schmaler Balken. Die feste Breite
+  // lässt sie mittig über die Spalte hinausragen, statt umzubrechen.
   barValue: {
+    width: 40,
+    textAlign: 'center',
     height: 14,
     color: colors.textSecondary,
     fontSize: 10,
@@ -426,10 +333,15 @@ const styles = themedStyles(() => ({
     backgroundColor: colors.track,
   },
   barLabel: {
+    width: 34,
+    textAlign: 'center',
     minHeight: 16,
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
+  },
+  barLabelDense: {
+    fontSize: 11,
   },
   barLabelCurrent: {
     color: colors.textPrimary,
@@ -515,20 +427,5 @@ const styles = themedStyles(() => ({
     fontSize: 15,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
-  },
-  editorMeta: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontVariant: ['tabular-nums'],
-  },
-  editorTags: {
-    gap: 8,
-  },
-  editorActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  editorAction: {
-    flex: 1,
   },
 }));

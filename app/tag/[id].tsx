@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { NewGroupSheet } from '../../src/components/settings/NewGroupSheet';
 import { Button } from '../../src/components/ui/Button';
 import { ChoiceChips } from '../../src/components/ui/ChoiceChips';
 import { ColorSwatchPicker } from '../../src/components/ui/ColorSwatchPicker';
@@ -12,6 +11,8 @@ import { SectionCard } from '../../src/components/ui/SectionCard';
 import { TextField } from '../../src/components/ui/TextField';
 import { colors, tagPalette } from '../../src/constants/colors';
 import { GENERAL_TAG_GROUP_ID, GENERAL_TAG_ID } from '../../src/constants/config';
+import { routes } from '../../src/constants/routes';
+import { useOpenSheet } from '../../src/hooks/useSheet';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { themedStyles } from '../../src/theme/runtime';
@@ -34,8 +35,9 @@ export default function TagDetailScreen() {
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(tagPalette[0]);
   const [groupId, setGroupId] = useState<string>(GENERAL_TAG_GROUP_ID);
-  const [groupSheetVisible, setGroupSheetVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const openSheet = useOpenSheet();
+  const knownGroupIds = useRef<Set<string> | null>(null);
 
   // Nur beim Öffnen befüllen, damit ein Abgleich im Hintergrund keine Eingaben überschreibt.
   useEffect(() => {
@@ -46,6 +48,20 @@ export default function TagDetailScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tag?.id]);
+
+  // Eine über "Neue Gruppe" angelegte Gruppe wird nach der Rückkehr direkt gewählt.
+  useEffect(() => {
+    const known = knownGroupIds.current;
+    if (!known) {
+      return;
+    }
+
+    const createdGroup = tagGroups.find((group) => !known.has(group.id));
+    if (createdGroup) {
+      knownGroupIds.current = null;
+      setGroupId(createdGroup.id);
+    }
+  }, [tagGroups]);
 
   const groupOptions = useMemo(
     () =>
@@ -155,7 +171,10 @@ export default function TagDetailScreen() {
                 label="Neue Gruppe"
                 variant="secondary"
                 compact
-                onPress={() => setGroupSheetVisible(true)}
+                onPress={() => {
+                  knownGroupIds.current = new Set(tagGroups.map((group) => group.id));
+                  openSheet(routes.newGroupSheet);
+                }}
               />
             </View>
           )}
@@ -172,12 +191,6 @@ export default function TagDetailScreen() {
           <Button label="Sichern" onPress={() => void save()} disabled={!name.trim() || isSaving} />
         </View>
       </View>
-
-      <NewGroupSheet
-        visible={groupSheetVisible}
-        onClose={() => setGroupSheetVisible(false)}
-        onCreated={(group) => setGroupId(group.id)}
-      />
     </Screen>
   );
 }

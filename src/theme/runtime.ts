@@ -1,4 +1,4 @@
-import { ImageStyle, StyleSheet, TextStyle, ViewStyle } from 'react-native';
+import { Appearance, ImageStyle, Platform, StyleSheet, TextStyle, ViewStyle } from 'react-native';
 
 import { DEFAULT_THEME, Palette, ThemeName, palettes } from './palettes';
 
@@ -15,6 +15,14 @@ export const getPalette = (): Palette => palettes[activeTheme];
  */
 export const setActiveTheme = (name: ThemeName): void => {
   activeTheme = name;
+
+  // Was iOS selbst zeichnet (Sheets, Tastatur, Rückfragen), kennt die Farbwelt
+  // nicht und richtet sich nach hell oder dunkel. Die App ist systemweit auf
+  // dunkel festgelegt; ohne diese Vorgabe stünde in der hellen Farbwelt dunkle
+  // Schrift auf einem dunklen Sheet.
+  if (Platform.OS === 'ios') {
+    Appearance.setColorScheme(palettes[name].scheme);
+  }
 };
 
 type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };

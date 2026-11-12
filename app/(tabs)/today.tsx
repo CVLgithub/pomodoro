@@ -23,13 +23,11 @@ export default function StopwatchScreen() {
   const stopwatch = useStopwatch();
   const tasks = useTasksStore((state) => state.tasks);
   const tags = useTagsStore((state) => state.tags);
-  const { start, switchPhase, stop, selectTask, setFreeSessionTag } = useStopwatchStore(
+  const { start, switchPhase, stop } = useStopwatchStore(
     useShallow((state) => ({
       start: state.start,
       switchPhase: state.switchPhase,
       stop: state.stop,
-      selectTask: state.selectTask,
-      setFreeSessionTag: state.setFreeSessionTag,
     })),
   );
 
@@ -82,12 +80,7 @@ export default function StopwatchScreen() {
         tags={tags}
         selectedTaskId={stopwatch.selectedTaskId}
         selectedTagId={stopwatch.selectedTagId}
-        onSelectTask={(taskId) =>
-          runSafely(() => selectTask(taskId), 'Aufgabe konnte nicht zugewiesen werden')
-        }
-        onSelectFreeTag={(tagId) =>
-          runSafely(() => setFreeSessionTag(tagId), 'Tag konnte nicht gesetzt werden')
-        }
+        target="stopwatch"
       />
       <ControlRow>
         {isRunning ? (

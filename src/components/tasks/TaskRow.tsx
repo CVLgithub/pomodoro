@@ -1,12 +1,15 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
+import { useSettingsStore } from '../../store/settingsStore';
 import { themedStyles } from '../../theme/runtime';
 import { Tag } from '../../types/tag';
 import { Task } from '../../types/task';
 import { formatFullDateLabel } from '../../utils/date';
+import { formatTagWithGroup } from '../../utils/tagGroups';
 import { formatTaskRecurrenceDays, isTaskRecurring } from '../../utils/taskRecurrence';
 import { Ionicon } from '../ui/Ionicon';
+import { haptics } from '../../utils/haptics';
 
 interface TaskRowProps {
   task: Task;
@@ -33,12 +36,16 @@ export const TaskRow = ({
   completedAt,
   disableToggle = false,
 }: TaskRowProps) => {
+  // Die Gruppe steht als Vorsatz vor dem Tag ("Uni › Mathe") und braucht so
+  // keine eigene Zeile. "Allgemein" bleibt weg, weil es nichts einordnet.
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
+  const tagLabel = tag ? formatTagWithGroup(tag, tagGroups) : null;
   const resolvedIsCompleted = isCompleted ?? task.isCompleted;
   const resolvedCompletedAt = completedAt ?? task.completedAt;
   const recurring = isTaskRecurring(task);
   const dateLabel = displayDate !== undefined ? displayDate : task.date;
   const meta = [
-    tag?.name,
+    tagLabel,
     recurring ? formatTaskRecurrenceDays(task.recurrenceDays) || 'wiederholend' : null,
     dateLabel,
     resolvedIsCompleted && resolvedCompletedAt
@@ -55,7 +62,15 @@ export const TaskRow = ({
         accessibilityLabel={`${task.title} erledigt`}
         accessibilityState={{ checked: resolvedIsCompleted, disabled: disableToggle }}
         disabled={disableToggle}
-        onPress={() => onToggle(!resolvedIsCompleted)}
+        onPress={() => {
+          if (resolvedIsCompleted) {
+            haptics.light();
+          } else {
+            haptics.success();
+          }
+
+          onToggle(!resolvedIsCompleted);
+        }}
         style={styles.checkboxArea}
       >
         <View

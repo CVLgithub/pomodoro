@@ -32,6 +32,7 @@ import {
   getResolvedTaskOccurrencesInRange,
   isTaskRecurring,
 } from '../../src/utils/taskRecurrence';
+import { haptics } from '../../src/utils/haptics';
 
 type TasksView = 'list' | 'calendar';
 
@@ -109,9 +110,18 @@ export default function TasksScreen() {
   );
   const usedTags = useMemo(() => {
     const usedIds = new Set(tasks.map((task) => task.tagId));
-    return tags.filter((tag) => usedIds.has(tag.id));
+    // Wiederkehrende Aufgaben sind nie endgültig erledigt und zählen als offen.
+    const openIds = new Set(
+      tasks.filter((task) => isTaskRecurring(task) || !task.isCompleted).map((task) => task.tagId),
+    );
+    const used = tags
+      .filter((tag) => usedIds.has(tag.id))
+      .map((tag) => ({ tag, hasOpenTasks: openIds.has(tag.id) }));
+
+    // Tags mit offenen Aufgaben stehen vorn; innerhalb bleibt die Reihenfolge.
+    return [...used.filter((entry) => entry.hasOpenTasks), ...used.filter((entry) => !entry.hasOpenTasks)];
   }, [tags, tasks]);
-  const activeFilter = tagFilter && usedTags.some((tag) => tag.id === tagFilter) ? tagFilter : null;
+  const activeFilter = tagFilter && usedTags.some((entry) => entry.tag.id === tagFilter) ? tagFilter : null;
 
   const { sections, completed } = useMemo(() => {
     const todayKey = getTodayDateKey();
@@ -248,16 +258,29 @@ export default function TasksScreen() {
               style={styles.filterScroll}
               contentContainerStyle={styles.filters}
             >
-              {[null, ...usedTags].map((tag) => {
+              {[null, ...usedTags].map((entry) => {
+                const tag = entry?.tag;
                 const selected = (tag?.id ?? null) === activeFilter;
+                // Tags, bei denen nichts mehr offen ist, treten zurück.
+                const quiet = entry !== null && !entry.hasOpenTasks && !selected;
 
                 return (
                   <Pressable
                     key={tag?.id ?? 'all'}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    onPress={() => setTagFilter(tag?.id ?? null)}
-                    style={[styles.filter, selected ? styles.filterSelected : null]}
+                    onPress={() => {
+                      if (!selected) {
+                        haptics.selection();
+                      }
+
+                      setTagFilter(tag?.id ?? null);
+                    }}
+                    style={[
+                      styles.filter,
+                      selected ? styles.filterSelected : null,
+                      quiet ? styles.filterQuiet : null,
+                    ]}
                   >
                     {tag ? <View style={[styles.filterDot, { backgroundColor: tag.color }]} /> : null}
                     <Text style={[styles.filterLabel, selected ? styles.filterLabelSelected : null]}>
@@ -383,6 +406,9 @@ const styles = themedStyles(() => ({
   filterSelected: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
+  },
+  filterQuiet: {
+    opacity: 0.5,
   },
   filterDot: {
     width: 9,

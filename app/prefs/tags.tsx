@@ -1,14 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { NewGroupSheet } from '../../src/components/settings/NewGroupSheet';
 import { Button } from '../../src/components/ui/Button';
 import { CircleButton } from '../../src/components/ui/CircleButton';
 import { ListGroup, ListRow } from '../../src/components/ui/List';
 import { Screen } from '../../src/components/ui/Screen';
 import { GENERAL_TAG_GROUP_ID } from '../../src/constants/config';
 import { routes } from '../../src/constants/routes';
+import { useOpenSheet } from '../../src/hooks/useSheet';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { confirmAction } from '../../src/utils/confirm';
@@ -20,7 +20,7 @@ export default function TagsScreen() {
   const loadTags = useTagsStore((state) => state.loadTags);
   const tagGroups = useSettingsStore((state) => state.tagGroups);
   const deleteTagGroup = useSettingsStore((state) => state.deleteTagGroup);
-  const [groupSheetVisible, setGroupSheetVisible] = useState(false);
+  const openSheet = useOpenSheet();
 
   const groups = useMemo(() => {
     const sortedTags = sortTagsByGroupAndName(tags);
@@ -99,9 +99,11 @@ export default function TagsScreen() {
         </ListGroup>
       ))}
 
-      <Button label="Neue Gruppe" variant="secondary" onPress={() => setGroupSheetVisible(true)} />
-
-      <NewGroupSheet visible={groupSheetVisible} onClose={() => setGroupSheetVisible(false)} />
+      <Button
+        label="Neue Gruppe"
+        variant="secondary"
+        onPress={() => openSheet(routes.newGroupSheet)}
+      />
     </Screen>
   );
 }

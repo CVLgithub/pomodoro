@@ -3,6 +3,7 @@ import { Pressable, Text } from 'react-native';
 import { colors } from '../../constants/colors';
 import { themedStyles } from '../../theme/runtime';
 import { Glass } from './Glass';
+import { haptics } from '../../utils/haptics';
 
 interface SegmentedProps<T extends string> {
   options: readonly { value: T; label: string }[];
@@ -22,7 +23,13 @@ export const Segmented = <T extends string>({ options, value, onChange, label }:
           key={option.value}
           accessibilityRole="tab"
           accessibilityState={{ selected }}
-          onPress={() => onChange(option.value)}
+          onPress={() => {
+            if (!selected) {
+              haptics.selection();
+            }
+
+            onChange(option.value);
+          }}
           style={[styles.segment, selected ? styles.segmentSelected : null]}
         >
           <Text style={[styles.label, selected ? styles.labelSelected : null]}>{option.label}</Text>

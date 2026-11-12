@@ -6,6 +6,9 @@ import type { Href } from 'expo-router';
  */
 const route = (path: string): Href => path as Href;
 
+/** Wofür die Zuordnungs-Auswahl geöffnet wird: Timer oder Stoppuhr. */
+export type AssignmentTarget = 'timer' | 'stopwatch';
+
 export const routes = {
   timer: route('/(tabs)/timer'),
   tasks: route('/(tabs)/tasks'),
@@ -19,4 +22,10 @@ export const routes = {
   syncQueue: route('/prefs/sync-queue'),
   connection: route('/prefs/connection'),
   import: route('/downsync'),
+  // Sheets: Routen unter /sheet erscheinen als natives Sheet über dem aktuellen Screen.
+  assignmentSheet: (target: AssignmentTarget) => route(`/sheet/assignment?target=${target}`),
+  timerModeSheet: route('/sheet/timer-mode'),
+  manualSessionSheet: route('/sheet/manual-session'),
+  sessionSheet: (id: string) => route(`/sheet/session/${id}`),
+  newGroupSheet: route('/sheet/new-group'),
 } as const;

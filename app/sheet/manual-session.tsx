@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 
-import { colors } from '../../constants/colors';
-import { FREE_SESSION_TITLE, GENERAL_TAG_ID } from '../../constants/config';
-import { useSessionsStore } from '../../store/sessionsStore';
-import { themedStyles } from '../../theme/runtime';
-import { Tag } from '../../types/tag';
-import { addMinutes, formatDateKey, formatTimeLabel, toLocalIsoString } from '../../utils/date';
-import { validateManualSession } from '../../utils/sessionInput';
-import { Button } from '../ui/Button';
-import { ModalSheet } from '../ui/ModalSheet';
-import { TagChips } from '../ui/TagChips';
-import { TextField } from '../ui/TextField';
+import { Button } from '../../src/components/ui/Button';
+import { Sheet } from '../../src/components/ui/Sheet';
+import { TagChips } from '../../src/components/ui/TagChips';
+import { TextField } from '../../src/components/ui/TextField';
+import { colors } from '../../src/constants/colors';
+import { FREE_SESSION_TITLE, GENERAL_TAG_ID } from '../../src/constants/config';
+import { useSheetClose } from '../../src/hooks/useSheet';
+import { useSessionsStore } from '../../src/store/sessionsStore';
+import { useTagsStore } from '../../src/store/tagsStore';
+import { themedStyles } from '../../src/theme/runtime';
+import { addMinutes, formatDateKey, formatTimeLabel, toLocalIsoString } from '../../src/utils/date';
+import { haptics } from '../../src/utils/haptics';
+import { validateManualSession } from '../../src/utils/sessionInput';
 
 const buildDefaults = () => {
   const now = new Date();
@@ -25,25 +27,14 @@ const buildDefaults = () => {
   };
 };
 
-interface ManualSessionSheetProps {
-  visible: boolean;
-  tags: Tag[];
-  onClose: () => void;
-}
-
 /** Trägt eine bereits abgeschlossene Session nach. */
-export const ManualSessionSheet = ({ visible, tags, onClose }: ManualSessionSheetProps) => {
+export default function ManualSessionSheet() {
+  const close = useSheetClose();
+  const tags = useTagsStore((state) => state.tags);
   const createSessionEntry = useSessionsStore((state) => state.createSessionEntry);
   const [draft, setDraft] = useState(buildDefaults);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setDraft(buildDefaults());
-      setError(null);
-    }
-  }, [visible]);
 
   const update = (patch: Partial<typeof draft>) => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -68,19 +59,19 @@ export const ManualSessionSheet = ({ visible, tags, onClose }: ManualSessionShee
         endTime: toLocalIsoString(result.end),
         tagId: draft.tagId,
       });
-      onClose();
+      haptics.success();
+      close();
     } catch (saveError) {
+      setIsSaving(false);
       Alert.alert(
         'Session konnte nicht gespeichert werden',
         saveError instanceof Error ? saveError.message : 'Unbekannter Fehler',
       );
-    } finally {
-      setIsSaving(false);
     }
   };
 
   return (
-    <ModalSheet visible={visible} title="Session nachtragen" onClose={onClose} swipeToClose>
+    <Sheet title="Session nachtragen">
       <TextField
         label="Name"
         value={draft.title}
@@ -129,9 +120,9 @@ export const ManualSessionSheet = ({ visible, tags, onClose }: ManualSessionShee
         </Text>
       ) : null}
       <Button label="Session hinzufügen" onPress={() => void save()} disabled={isSaving} />
-    </ModalSheet>
+    </Sheet>
   );
-};
+}
 
 const styles = themedStyles(() => ({
   row: {

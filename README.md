@@ -16,7 +16,7 @@
 - `src/theme/runtime.ts`: aktive Farbwelt und `themedStyles(() => ({...}))` als Ersatz fuer `StyleSheet.create` auf Modulebene.
 - `src/constants/colors.ts`: `colors.*` liest immer die aktive Farbwelt. Nur zur Renderzeit oder in `themedStyles` lesen.
 - Nach einem Wechsel der Farbwelt baut `app/_layout.tsx` den Baum ueber `key={theme}` neu auf.
-- Bausteine in `src/components/ui/`: `Glass`, `Backdrop`, `Screen`/`ScreenShell`, `GlassTabBar`, `Segmented`, `CircleButton`, `Button`, `TagChips`, `ModalSheet`, `TextField`.
+- Bausteine in `src/components/ui/`: `Glass`, `Backdrop`, `Screen`/`ScreenShell`, `GlassTabBar`, `Segmented`, `CircleButton`, `Button`, `TagChips`, `Sheet`, `TextField`.
 
 ## 2. Verwendete Pakete mit Installationsbefehlen
 
@@ -177,7 +177,8 @@ src/
 - `settings.tsx`: Darstellung, Startseite, Pausenwechsel, Synchronisieren und Verweise auf die Unterseiten.
 - `prefs/notifications.tsx`, `prefs/tags.tsx`, `prefs/deleted-sessions.tsx`, `prefs/sync-queue.tsx`, `prefs/connection.tsx`: Unterseiten der Einstellungen.
 - `task/[id].tsx`: Aufgabe bearbeiten; Tag als Chips, Datum mit Schnellauswahl, woechentliche Wiederholung, "Im Timer verwenden".
-- `tag/[id].tsx`: Tag bearbeiten. Tags werden nur hier angelegt, Gruppen nur ueber `NewGroupSheet`.
+- `tag/[id].tsx`: Tag bearbeiten. Tags werden nur hier angelegt, Gruppen nur ueber das Sheet `sheet/new-group.tsx`.
+- `sheet/*.tsx`: Sheets als eigene Routen (Zuordnung, Modus und Dauer, Session nachtragen, Session bearbeiten, neue Gruppe). iOS und Android zeigen sie als natives Sheet des Systems in Hoehe des Inhalts; Aufbau ueber `Sheet`, Stack-Optionen ueber `sheetScreenOptions`, Oeffnen und Schliessen ueber `src/hooks/useSheet.ts`.
 - `downsync.tsx`: Manueller Abruf und Abgleich der Eintraege vom Backend.
 
 ### Gemeinsame Logik

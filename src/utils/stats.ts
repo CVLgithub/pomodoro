@@ -125,7 +125,7 @@ export const buildStatsBars = (
 
       return {
         key,
-        label: MONTH_LABELS[month.getMonth()].slice(0, 1),
+        label: MONTH_LABELS[month.getMonth()],
         minutes: totals.get(key) ?? 0,
         isCurrent: index === ALL_TIME_MONTHS - 1,
       };
