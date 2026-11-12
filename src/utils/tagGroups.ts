@@ -49,6 +49,19 @@ export const getTagGroupKey = (groupId?: string | null): string =>
 export const getTagGroupLabel = (groupId?: string | null, groups: TagGroup[] = []): string =>
   groups.find((group) => group.id === groupId)?.name ?? DEFAULT_TAG_GROUP_LABEL;
 
+/**
+ * Tag mit vorangestellter Gruppe, z. B. "Uni › Mathe". "Allgemein" und
+ * gelöschte Gruppen bleiben weg, weil sie nichts einordnen.
+ */
+export const formatTagWithGroup = (tag: Tag, groups: TagGroup[]): string => {
+  const group =
+    tag.groupId && tag.groupId !== GENERAL_TAG_GROUP_ID
+      ? groups.find((entry) => entry.id === tag.groupId && !entry.isDeleted)
+      : undefined;
+
+  return group ? `${group.name} › ${tag.name}` : tag.name;
+};
+
 export const compareTagGroupNames = (
   left: string | null | undefined,
   right: string | null | undefined,

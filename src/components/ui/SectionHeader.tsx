@@ -1,8 +1,9 @@
 import { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
 import { spacing } from '../../constants/spacing';
+import { themedStyles } from '../../theme/runtime';
 
 interface SectionHeaderProps {
   title: string;
@@ -20,7 +21,7 @@ export const SectionHeader = ({ title, subtitle, action }: SectionHeaderProps) =
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -33,12 +34,12 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
   },
   subtitle: {
     color: colors.textSecondary,
     fontSize: 14,
   },
-});
+}));
 

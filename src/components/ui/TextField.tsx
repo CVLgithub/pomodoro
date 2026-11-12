@@ -9,6 +9,7 @@ import {
 
 import { colors } from '../../constants/colors';
 import { radii, spacing } from '../../constants/spacing';
+import { themedStyles } from '../../theme/runtime';
 
 interface TextFieldProps extends TextInputProps {
   label?: string;
@@ -32,27 +33,28 @@ export const TextField = forwardRef<ComponentRef<typeof TextInput>, TextFieldPro
 
 TextField.displayName = 'TextField';
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     gap: spacing.sm,
   },
   label: {
     color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: 4,
   },
   input: {
-    minHeight: 50,
-    borderRadius: radii.md,
+    minHeight: 52,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.glassLine,
     backgroundColor: colors.surfaceElevated,
     color: colors.textPrimary,
     paddingHorizontal: spacing.lg,
-    fontSize: 16,
+    fontSize: 17,
   },
   helper: {
     color: colors.textMuted,
     fontSize: 13,
   },
-});
+}));

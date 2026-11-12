@@ -231,7 +231,7 @@ export const notificationService = {
     await notifications.scheduleNotificationAsync({
       content: {
         title: 'Tagesziel erreicht',
-        body: `Du hast heute ${hours} ${hours === 1 ? 'Stunde' : 'Stunden'} fokussiert gearbeitet.`,
+        body: `Du hast heute ${String(hours).replace('.', ',')} ${hours === 1 ? 'Stunde' : 'Stunden'} fokussiert gearbeitet.`,
         sound: true,
         priority: notifications.AndroidNotificationPriority?.HIGH,
       },

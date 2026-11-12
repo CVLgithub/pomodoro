@@ -1,82 +1,81 @@
+import { useState } from 'react';
+import { Text, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
-import { spacing } from '../../constants/spacing';
-import { formatDateKey } from '../../utils/date';
-import { Button } from '../ui/Button';
+import { getPalette, themedStyles } from '../../theme/runtime';
+import { formatDateKey, getTodayDateKey } from '../../utils/date';
+import { ChoiceChips } from '../ui/ChoiceChips';
+import { DateChoice, buildDateChoiceOptions, getDateChoice, getTomorrowDateKey } from './dateChoices';
 
-interface TaskDateFieldProps {
+export interface TaskDateFieldProps {
   date: string | null;
-  isPickerVisible: boolean;
-  onTogglePicker: () => void;
   onChangeDate: (date: string | null) => void;
   label?: string;
+  /** Bietet "Kein Datum" an. Wiederholende Aufgaben brauchen ein Startdatum. */
+  allowClear?: boolean;
 }
 
+/** Datumswahl mit Schnellauswahl; der Kalender erscheint nur für "Anderes Datum". */
 export const TaskDateField = ({
   date,
-  isPickerVisible,
-  onTogglePicker,
   onChangeDate,
   label = 'Datum',
-}: TaskDateFieldProps) => (
-  <View style={styles.fieldBlock}>
-    <Text style={styles.label}>{label}</Text>
-    <View style={styles.selector}>
-      <Text style={styles.value}>{date ?? 'Kein Datum gesetzt'}</Text>
-      <View style={styles.rowActions}>
-        <Button label="Ändern" variant="ghost" onPress={onTogglePicker} />
-        {date ? (
-          <Button label="Entfernen" variant="ghost" onPress={() => onChangeDate(null)} />
-        ) : null}
-      </View>
-    </View>
-    {isPickerVisible ? (
-      <DateTimePicker
-        value={date ? new Date(`${date}T12:00:00`) : new Date()}
-        mode="date"
-        display="spinner"
-        themeVariant="dark"
-        onChange={(_, selectedDate) => {
-          if (!selectedDate) {
-            return;
-          }
+  allowClear = true,
+}: TaskDateFieldProps) => {
+  const [pickerVisible, setPickerVisible] = useState(false);
 
-          onChangeDate(formatDateKey(selectedDate));
-        }}
+  const choose = (choice: DateChoice) => {
+    if (choice === 'other') {
+      setPickerVisible((visible) => !visible);
+      return;
+    }
+
+    setPickerVisible(false);
+    onChangeDate(
+      choice === 'none' ? null : choice === 'today' ? getTodayDateKey() : getTomorrowDateKey(),
+    );
+  };
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <ChoiceChips
+        options={buildDateChoiceOptions(date, allowClear)}
+        selected={[pickerVisible ? 'other' : getDateChoice(date)]}
+        onToggle={choose}
       />
-    ) : null}
-  </View>
-);
+      {pickerVisible ? (
+        <DateTimePicker
+          value={date ? new Date(`${date}T12:00:00`) : new Date()}
+          mode="date"
+          display="inline"
+          themeVariant={getPalette().scheme}
+          accentColor={colors.textPrimary}
+          onChange={(event, selectedDate) => {
+            if (event.type === 'dismissed') {
+              setPickerVisible(false);
+              return;
+            }
 
-const styles = StyleSheet.create({
-  fieldBlock: {
-    gap: spacing.sm,
+            if (selectedDate) {
+              onChangeDate(formatDateKey(selectedDate));
+            }
+          }}
+        />
+      ) : null}
+    </View>
+  );
+};
+
+const styles = themedStyles(() => ({
+  field: {
+    gap: 8,
   },
   label: {
+    paddingHorizontal: 4,
     color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  selector: {
-    minHeight: 52,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-    justifyContent: 'center',
-  },
-  value: {
-    color: colors.textPrimary,
-    fontSize: 15,
-  },
-  rowActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-});
+}));

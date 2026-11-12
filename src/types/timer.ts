@@ -15,6 +15,8 @@ export interface TimerStateRecord extends TimerDurations {
   startedAt: string | null;
   expectedEndAt: string | null;
   pausedRemainingSeconds: number | null;
+  /** Per "+5" angehängte Sekunden der laufenden Session; 0 außerhalb einer Session. */
+  extraSeconds: number;
   selectedTaskId: string | null;
   selectedTagId: string;
   completedFocusCountInCycle: number;

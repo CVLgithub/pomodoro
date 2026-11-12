@@ -1,152 +1,82 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Text, View } from 'react-native';
 
 import { colors } from '../../constants/colors';
-import { spacing } from '../../constants/spacing';
-import { Button } from '../ui/Button';
-import { TextField } from '../ui/TextField';
+import { getPalette, themedStyles } from '../../theme/runtime';
+import { getTodayDateKey } from '../../utils/date';
+import { ChoiceChips } from '../ui/ChoiceChips';
+import { DateChoice, buildDateChoiceOptions, getDateChoice, getTomorrowDateKey } from './dateChoices';
+import type { TaskDateFieldProps } from './TaskDateField';
 
-interface TaskDateFieldProps {
-  date: string | null;
-  isPickerVisible: boolean;
-  onTogglePicker: () => void;
-  onChangeDate: (date: string | null) => void;
-  label?: string;
-}
-
-const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-const normalizeDateKey = (value: string): string | null => {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return null;
-  }
-
-  if (!DATE_KEY_PATTERN.test(trimmed)) {
-    return null;
-  }
-
-  const [year, month, day] = trimmed.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-
-  return trimmed;
-};
-
+/** Web-Variante: Schnellauswahl plus das Datumsfeld des Browsers. */
 export const TaskDateField = ({
   date,
-  isPickerVisible,
-  onTogglePicker,
   onChangeDate,
   label = 'Datum',
+  allowClear = true,
 }: TaskDateFieldProps) => {
-  const [draft, setDraft] = useState(date ?? '');
-  const [errorText, setErrorText] = useState<string | null>(null);
+  const [pickerVisible, setPickerVisible] = useState(false);
 
-  useEffect(() => {
-    setDraft(date ?? '');
-    setErrorText(null);
-  }, [date, isPickerVisible]);
-
-  const handleApply = () => {
-    const normalized = normalizeDateKey(draft);
-
-    if (draft.trim() && !normalized) {
-      setErrorText('Bitte nutze das Format YYYY-MM-DD.');
+  const choose = (choice: DateChoice) => {
+    if (choice === 'other') {
+      setPickerVisible((visible) => !visible);
       return;
     }
 
-    onChangeDate(normalized);
-    onTogglePicker();
-  };
-
-  const handleCancel = () => {
-    setDraft(date ?? '');
-    setErrorText(null);
-    onTogglePicker();
+    setPickerVisible(false);
+    onChangeDate(
+      choice === 'none' ? null : choice === 'today' ? getTodayDateKey() : getTomorrowDateKey(),
+    );
   };
 
   return (
-    <View style={styles.fieldBlock}>
+    <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.selector}>
-        <Text style={styles.value}>{date ?? 'Kein Datum gesetzt'}</Text>
-        <View style={styles.rowActions}>
-          <Button
-            label={isPickerVisible ? 'Schließen' : 'Ändern'}
-            variant="ghost"
-            onPress={isPickerVisible ? handleCancel : onTogglePicker}
-          />
-          {date ? (
-            <Button label="Entfernen" variant="ghost" onPress={() => onChangeDate(null)} />
-          ) : null}
-        </View>
-      </View>
-      {isPickerVisible ? (
-        <View style={styles.editor}>
-          <TextField
-            label={label}
-            value={draft}
-            onChangeText={(value) => {
-              setDraft(value);
-              if (errorText) {
-                setErrorText(null);
-              }
-            }}
-            placeholder="2026-04-04"
-            autoCapitalize="none"
-            autoCorrect={false}
-            helperText={errorText ?? 'Format YYYY-MM-DD. Leer lassen entfernt das Datum.'}
-          />
-          <View style={styles.rowActions}>
-            <Button label="Übernehmen" onPress={handleApply} />
-            <Button label="Abbrechen" variant="secondary" onPress={handleCancel} />
-          </View>
-        </View>
+      <ChoiceChips
+        options={buildDateChoiceOptions(date, allowClear)}
+        selected={[pickerVisible ? 'other' : getDateChoice(date)]}
+        onToggle={choose}
+      />
+      {pickerVisible ? (
+        <input
+          type="date"
+          aria-label={label}
+          value={date ?? ''}
+          onChange={(event) => {
+            // Ein geleertes Feld liefert "", ein gültiges Datum immer JJJJ-MM-TT.
+            const value = event.target.value;
+            if (value) {
+              onChangeDate(value);
+            } else if (allowClear) {
+              onChangeDate(null);
+            }
+          }}
+          style={{
+            minHeight: 52,
+            boxSizing: 'border-box',
+            padding: '0 16px',
+            borderRadius: 18,
+            border: `1px solid ${colors.glassLine}`,
+            background: colors.surfaceElevated,
+            color: colors.textPrimary,
+            colorScheme: getPalette().scheme,
+            font: 'inherit',
+            fontSize: 17,
+          }}
+        />
       ) : null}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  fieldBlock: {
-    gap: spacing.sm,
+const styles = themedStyles(() => ({
+  field: {
+    gap: 8,
   },
   label: {
+    paddingHorizontal: 4,
     color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  selector: {
-    minHeight: 52,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-    justifyContent: 'center',
-  },
-  value: {
-    color: colors.textPrimary,
-    fontSize: 15,
-  },
-  rowActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  editor: {
-    gap: spacing.sm,
-  },
-});
+}));

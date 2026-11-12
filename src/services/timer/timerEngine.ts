@@ -36,6 +36,7 @@ export const timerEngine = {
     startedAt: null,
     expectedEndAt: null,
     pausedRemainingSeconds: null,
+    extraSeconds: 0,
     selectedTaskId: null,
     selectedTagId: GENERAL_TAG_ID,
     completedFocusCountInCycle: 0,
@@ -54,11 +55,40 @@ export const timerEngine = {
 
     return durationForMode(state, state.activeMode);
   },
+  /** Gesamtdauer der laufenden Session inklusive Verlängerungen. */
+  getSessionSeconds: (state: TimerStateRecord): number =>
+    durationForMode(state, state.activeMode) + Math.max(0, state.extraSeconds ?? 0),
   getElapsedSeconds: (state: TimerStateRecord, now: string | Date = new Date()): number =>
     Math.max(
       0,
-      durationForMode(state, state.activeMode) - timerEngine.getRemainingSeconds(state, now),
+      timerEngine.getSessionSeconds(state) - timerEngine.getRemainingSeconds(state, now),
     ),
+  /** Verlängert eine laufende oder pausierte Session; im Leerlauf ohne Wirkung. */
+  extend: (state: TimerStateRecord, seconds: number, now = new Date()): TimerStateRecord => {
+    if (seconds <= 0) {
+      return state;
+    }
+
+    if (state.status === 'running' && state.expectedEndAt) {
+      return {
+        ...state,
+        expectedEndAt: toLocalIsoString(addSeconds(state.expectedEndAt, seconds)),
+        extraSeconds: (state.extraSeconds ?? 0) + seconds,
+        updatedAt: toLocalIsoString(now),
+      };
+    }
+
+    if (state.status === 'paused' && state.pausedRemainingSeconds !== null) {
+      return {
+        ...state,
+        pausedRemainingSeconds: state.pausedRemainingSeconds + seconds,
+        extraSeconds: (state.extraSeconds ?? 0) + seconds,
+        updatedAt: toLocalIsoString(now),
+      };
+    }
+
+    return state;
+  },
   withMode: (state: TimerStateRecord, activeMode: TimerMode): TimerStateRecord => ({
     ...state,
     activeMode,
@@ -67,6 +97,7 @@ export const timerEngine = {
     startedAt: null,
     expectedEndAt: null,
     pausedRemainingSeconds: null,
+    extraSeconds: 0,
     updatedAt: toLocalIsoString(),
   }),
   withDurations: (
@@ -91,6 +122,7 @@ export const timerEngine = {
       startedAt: startTime,
       expectedEndAt,
       pausedRemainingSeconds: null,
+      extraSeconds: 0,
       updatedAt: startTime,
     };
   },
@@ -123,6 +155,7 @@ export const timerEngine = {
     startedAt: null,
     expectedEndAt: null,
     pausedRemainingSeconds: null,
+    extraSeconds: 0,
     updatedAt: toLocalIsoString(),
   }),
   finishNow: (state: TimerStateRecord, now = new Date()): TimerStateRecord => ({
@@ -132,6 +165,7 @@ export const timerEngine = {
     startedAt: null,
     expectedEndAt: null,
     pausedRemainingSeconds: null,
+    extraSeconds: 0,
     updatedAt: toLocalIsoString(now),
   }),
   complete: (
@@ -166,6 +200,7 @@ export const timerEngine = {
         startedAt: null,
         expectedEndAt: null,
         pausedRemainingSeconds: null,
+      extraSeconds: 0,
         completedFocusCountInCycle: completedFocusCount,
         updatedAt: completedAtIso,
       },
