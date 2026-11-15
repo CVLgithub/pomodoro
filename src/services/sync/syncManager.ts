@@ -67,7 +67,18 @@ const normalizeSyncPayload = (
   }
 
   if (entityType === 'tagGroup') {
-    return payload as PushTagGroupPayload;
+    const groupPayload = payload as PushTagGroupPayload;
+
+    return {
+      id: groupPayload.id,
+      name: groupPayload.name,
+      isCompleted: groupPayload.isCompleted,
+      completedAt: groupPayload.completedAt,
+      createdAt: groupPayload.createdAt,
+      updatedAt: groupPayload.updatedAt,
+      isDeleted: groupPayload.isDeleted,
+      deletedAt: groupPayload.deletedAt,
+    };
   }
 
   if (entityType === 'tag') {
@@ -82,6 +93,8 @@ const normalizeSyncPayload = (
       name: tagPayload.name,
       color: tagPayload.color,
       groupId: tagPayload.groupId,
+      isCompleted: tagPayload.isCompleted,
+      completedAt: tagPayload.completedAt,
       createdAt: tagPayload.createdAt,
       updatedAt: tagPayload.updatedAt,
       isDeleted: tagPayload.isDeleted,

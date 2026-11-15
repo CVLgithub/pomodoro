@@ -12,6 +12,7 @@ import { colors } from '../../src/constants/colors';
 import { routes } from '../../src/constants/routes';
 import { useOpenSheet } from '../../src/hooks/useSheet';
 import { useSessionsStore } from '../../src/store/sessionsStore';
+import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { themedStyles } from '../../src/theme/runtime';
 import { formatShortDateLabel, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
@@ -25,6 +26,7 @@ import {
   shiftStatsAnchor,
   summarizeSessions,
 } from '../../src/utils/stats';
+import { isTagCompleted } from '../../src/utils/tagGroups';
 
 const PERIOD_OPTIONS = [
   { value: 'day', label: 'Tag' },
@@ -44,6 +46,7 @@ export default function StatsScreen() {
   const openSheet = useOpenSheet();
   const sessions = useSessionsStore((state) => state.sessions);
   const tags = useTagsStore((state) => state.tags);
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
   const [period, setPeriod] = useState<StatsPeriod>('week');
   const [anchor, setAnchor] = useState(() => new Date());
   const [showAllSessions, setShowAllSessions] = useState(false);
@@ -61,9 +64,11 @@ export default function StatsScreen() {
   );
   const summary = useMemo(() => summarizeSessions(periodSessions), [periodSessions]);
   const { activeTagEntries, completedTagEntries, completedTagMinutes } = useMemo(() => {
-    const active = summary.tags.filter((entry) => !tagsById.get(entry.tagId)?.isCompleted);
+    const active = summary.tags.filter(
+      (entry) => !isTagCompleted(tagsById.get(entry.tagId), tagGroups),
+    );
     const completed = summary.tags.filter((entry) =>
-      Boolean(tagsById.get(entry.tagId)?.isCompleted),
+      isTagCompleted(tagsById.get(entry.tagId), tagGroups),
     );
     const completedMinutes = completed.reduce((sum, entry) => sum + entry.minutes, 0);
 
@@ -72,7 +77,7 @@ export default function StatsScreen() {
       completedTagEntries: completed,
       completedTagMinutes: completedMinutes,
     };
-  }, [summary.tags, tagsById]);
+  }, [summary.tags, tagGroups, tagsById]);
   const bars = useMemo(
     () => buildStatsBars(period, anchor, period === 'all' ? sessions : periodSessions, todayKey),
     [anchor, period, periodSessions, sessions, todayKey],

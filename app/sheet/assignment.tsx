@@ -16,7 +16,7 @@ import { themedStyles } from '../../src/theme/runtime';
 import { Task } from '../../src/types/task';
 import { formatShortDateLabel } from '../../src/utils/date';
 import { haptics } from '../../src/utils/haptics';
-import { formatTagWithGroup } from '../../src/utils/tagGroups';
+import { formatTagWithGroup, isTagCompleted } from '../../src/utils/tagGroups';
 import { formatTaskRecurrenceDays, isTaskRecurring } from '../../src/utils/taskRecurrence';
 
 const sortTasks = (left: Task, right: Task) => {
@@ -57,9 +57,9 @@ export default function AssignmentSheet() {
   const openTasks = useMemo(
     () =>
       tasks
-        .filter((task) => !task.isCompleted && !tagsById.get(task.tagId)?.isCompleted)
+        .filter((task) => !task.isCompleted && !isTagCompleted(tagsById.get(task.tagId), tagGroups))
         .sort(sortTasks),
-    [tagsById, tasks],
+    [tagGroups, tagsById, tasks],
   );
   const hasSelectedTask = openTasks.some((task) => task.id === selectedTaskId);
 

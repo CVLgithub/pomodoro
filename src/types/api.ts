@@ -13,15 +13,45 @@ export type PushTaskPayload =
 export type PushTagPayload =
   | Pick<
       Tag,
-      'id' | 'name' | 'color' | 'groupId' | 'isCompleted' | 'createdAt' | 'updatedAt' | 'isDeleted' | 'deletedAt'
+      | 'id'
+      | 'name'
+      | 'color'
+      | 'groupId'
+      | 'isCompleted'
+      | 'completedAt'
+      | 'createdAt'
+      | 'updatedAt'
+      | 'isDeleted'
+      | 'deletedAt'
     >
   | TagDeletePayload;
-export type PushTagGroupPayload = Pick<TagGroup, 'id' | 'name' | 'createdAt' | 'updatedAt' | 'isDeleted' | 'deletedAt'>;
+export type PushTagGroupPayload = Pick<
+  TagGroup,
+  | 'id'
+  | 'name'
+  | 'isCompleted'
+  | 'completedAt'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'isDeleted'
+  | 'deletedAt'
+>;
 export type PushSessionPayload = Pick<
   Session,
   'id' | 'title' | 'date' | 'startTime' | 'endTime' | 'durationMinutes' | 'taskId' | 'tagId' |
   'createdAt' | 'updatedAt' | 'isDeleted' | 'deletedAt'
 >;
+
+export interface EntriesTagGroup {
+  id: string;
+  name: string;
+  isCompleted?: boolean;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  isDeleted: boolean;
+  deletedAt: string | null;
+}
 
 export interface EntriesTag {
   id: string;
@@ -69,5 +99,5 @@ export interface EntriesResponse {
   tags: EntriesTag[];
   tasks: EntriesTask[];
   sessions: EntriesSession[];
-  tagGroups: TagGroup[];
+  tagGroups: EntriesTagGroup[];
 }

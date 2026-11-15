@@ -40,6 +40,7 @@ export const toTagPushPayload = (tag: {
   color: string;
   groupId: string | null;
   isCompleted: boolean;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
   isDeleted: boolean;
@@ -50,6 +51,7 @@ export const toTagPushPayload = (tag: {
   color: tag.color,
   groupId: tag.groupId,
   isCompleted: tag.isCompleted,
+  completedAt: tag.completedAt,
   createdAt: tag.createdAt,
   updatedAt: tag.updatedAt,
   isDeleted: tag.isDeleted,

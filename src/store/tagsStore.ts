@@ -19,6 +19,7 @@ import {
 } from '../services/sync/payloads';
 import { CreateTagInput, Tag, UpdateTagInput } from '../types/tag';
 import { useSessionsStore } from './sessionsStore';
+import { useSettingsStore } from './settingsStore';
 import { useSyncStore } from './syncStore';
 import { useTasksStore } from './tasksStore';
 import { useStopwatchStore } from './stopwatchStore';
@@ -87,6 +88,14 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
     }
 
     const tag = await updateTagRecord(id, input);
+    if (!tag.isCompleted && tag.groupId) {
+      const parentGroup = useSettingsStore
+        .getState()
+        .tagGroups.find((entry) => entry.id === tag.groupId);
+      if (parentGroup?.isCompleted) {
+        await useSettingsStore.getState().setTagGroupCompleted(parentGroup.id, false);
+      }
+    }
     await get().loadTags();
     if (tag.isCompleted) {
       await Promise.all([

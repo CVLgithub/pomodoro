@@ -255,17 +255,30 @@ const migrations: readonly Migration[] = [
   {
     version: 11,
     apply: async (db) => {
-      const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tags);');
-      if (!columns.some((column) => column.name === 'isCompleted')) {
+      const tagColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tags);');
+      if (!tagColumns.some((column) => column.name === 'isCompleted')) {
         await db.execAsync(
           'ALTER TABLE tags ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0;',
         );
       }
-      if (!columns.some((column) => column.name === 'completedAt')) {
+      if (!tagColumns.some((column) => column.name === 'completedAt')) {
         await db.execAsync('ALTER TABLE tags ADD COLUMN completedAt TEXT;');
       }
       await db.execAsync(
         'CREATE INDEX IF NOT EXISTS idx_tags_is_completed ON tags (isCompleted);',
+      );
+
+      const groupColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tag_groups);');
+      if (!groupColumns.some((column) => column.name === 'isCompleted')) {
+        await db.execAsync(
+          'ALTER TABLE tag_groups ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0;',
+        );
+      }
+      if (!groupColumns.some((column) => column.name === 'completedAt')) {
+        await db.execAsync('ALTER TABLE tag_groups ADD COLUMN completedAt TEXT;');
+      }
+      await db.execAsync(
+        'CREATE INDEX IF NOT EXISTS idx_tag_groups_is_completed ON tag_groups (isCompleted);',
       );
     },
   },

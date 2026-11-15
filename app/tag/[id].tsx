@@ -68,11 +68,15 @@ export default function TagDetailScreen() {
 
   const groupOptions = useMemo(
     () =>
-      buildTagGroupOptions(tags, tagGroups).map((option) => ({
+      buildTagGroupOptions(
+        tags,
+        tagGroups.filter((group) => !group.isCompleted || group.id === groupId),
+        { includeCompleted: true },
+      ).map((option) => ({
         value: option.key,
         label: option.label,
       })),
-    [tagGroups, tags],
+    [groupId, tagGroups, tags],
   );
 
   const reportError = (title: string) => (error: unknown) => {

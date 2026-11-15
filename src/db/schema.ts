@@ -18,6 +18,8 @@ export const buildSchemaStatements = (): string[] => {
       CREATE TABLE IF NOT EXISTS tag_groups (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL,
+        isCompleted INTEGER NOT NULL DEFAULT 0,
+        completedAt TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         isDeleted INTEGER NOT NULL DEFAULT 0,
@@ -136,6 +138,7 @@ export const buildSchemaStatements = (): string[] => {
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_group_name_unique ON tags (COALESCE(groupId, '${GENERAL_TAG_GROUP_ID}'), name COLLATE NOCASE) WHERE isDeleted = 0;`,
     'CREATE INDEX IF NOT EXISTS idx_tasks_is_deleted ON tasks (isDeleted);',
     'CREATE INDEX IF NOT EXISTS idx_sessions_is_deleted ON sessions (isDeleted);',
+    'CREATE INDEX IF NOT EXISTS idx_tag_groups_is_completed ON tag_groups (isCompleted);',
     'CREATE INDEX IF NOT EXISTS idx_tag_groups_is_deleted ON tag_groups (isDeleted);',
     'CREATE INDEX IF NOT EXISTS idx_task_occurrence_completions_date ON task_occurrence_completions (date);',
     'CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions (date DESC);',

@@ -29,10 +29,15 @@ import {
   createTagGroup as createTagGroupRecord,
   deleteTagGroup as deleteTagGroupRecord,
   listTagGroups,
+  setTagGroupCompleted as setTagGroupCompletedRecord,
 } from '../db/repositories/tagGroupsRepository';
 import { getTagById } from '../db/repositories/tagsRepository';
 import { syncManager } from '../services/sync/syncManager';
 import { toTagPushPayload } from '../services/sync/payloads';
+import { useStopwatchStore } from './stopwatchStore';
+import { useSyncStore } from './syncStore';
+import { useTagsStore } from './tagsStore';
+import { useTimerStore } from './timerStore';
 
 interface SettingsStoreState {
   backendUrl: string;
@@ -54,6 +59,7 @@ interface SettingsStoreState {
   saveTheme: (value: ThemeName) => Promise<void>;
   saveUserId: (value: string) => Promise<string>;
   createTagGroup: (value: string) => Promise<TagGroup>;
+  setTagGroupCompleted: (groupId: string, isCompleted: boolean) => Promise<void>;
   deleteTagGroup: (groupId: string) => Promise<void>;
 }
 
@@ -174,11 +180,53 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     }
 
     const group = await createTagGroupRecord(groupName);
-    await syncManager.pushTagGroup(group);
+    try {
+      await syncManager.pushTagGroup(group);
+    } catch {
+      // Sync failures are captured by the queue.
+    }
     const tagGroups = [...existingGroups, group];
     set({ tagGroups, isHydrated: true });
 
     return group;
+  },
+  setTagGroupCompleted: async (groupId, isCompleted) => {
+    const { group, updatedTagIds } = await setTagGroupCompletedRecord(groupId, isCompleted);
+    const groups = await listTagGroups();
+    set({ tagGroups: groups, isHydrated: true });
+
+    await useTagsStore.getState().loadTags();
+
+    if (isCompleted) {
+      const groupTags = useTagsStore
+        .getState()
+        .tags.filter((tag) => tag.groupId === groupId || updatedTagIds.includes(tag.id));
+      for (const tag of groupTags) {
+        await Promise.all([
+          useTimerStore.getState().handleDeletedTag(tag.id),
+          useStopwatchStore.getState().handleDeletedTag(tag.id),
+        ]);
+      }
+    }
+
+    try {
+      await syncManager.pushTagGroup(group);
+    } catch {
+      // Sync failures are captured by the queue.
+    }
+
+    for (const tagId of updatedTagIds) {
+      const tag = await getTagById(tagId);
+      if (tag) {
+        try {
+          await syncManager.pushTag(tag.id, toTagPushPayload(tag));
+        } catch {
+          // Sync failures are captured by the queue.
+        }
+      }
+    }
+
+    await useSyncStore.getState().loadQueue();
   },
   deleteTagGroup: async (groupId) => {
     const group = get().tagGroups.find((entry) => entry.id === groupId);

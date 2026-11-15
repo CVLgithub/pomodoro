@@ -12,6 +12,7 @@ import { Screen } from '../../src/components/ui/Screen';
 import { Segmented } from '../../src/components/ui/Segmented';
 import { colors } from '../../src/constants/colors';
 import { GENERAL_TAG_ID } from '../../src/constants/config';
+import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
 import { useUiStore } from '../../src/store/uiStore';
@@ -33,6 +34,7 @@ import {
   isTaskRecurring,
 } from '../../src/utils/taskRecurrence';
 import { haptics } from '../../src/utils/haptics';
+import { isTagCompleted } from '../../src/utils/tagGroups';
 
 type TasksView = 'list' | 'calendar';
 
@@ -97,6 +99,7 @@ export default function TasksScreen() {
   const createTask = useTasksStore((state) => state.createTask);
   const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion);
   const tags = useTagsStore((state) => state.tags);
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
   const selectedDate = useUiStore((state) => state.selectedCalendarDate);
   const setSelectedDate = useUiStore((state) => state.setSelectedCalendarDate);
   const [visibleMonthDate, setVisibleMonthDate] = useState(selectedDate);
@@ -106,8 +109,8 @@ export default function TasksScreen() {
     [tags],
   );
   const activeTagTasks = useMemo(
-    () => tasks.filter((task) => !tagsById[task.tagId]?.isCompleted),
-    [tagsById, tasks],
+    () => tasks.filter((task) => !isTagCompleted(tagsById[task.tagId], tagGroups)),
+    [tagGroups, tagsById, tasks],
   );
   const completionLookup = useMemo(
     () => buildTaskOccurrenceCompletionLookup(occurrenceCompletions),
@@ -122,12 +125,12 @@ export default function TasksScreen() {
         .map((task) => task.tagId),
     );
     const used = tags
-      .filter((tag) => !tag.isCompleted && usedIds.has(tag.id))
+      .filter((tag) => !isTagCompleted(tag, tagGroups) && usedIds.has(tag.id))
       .map((tag) => ({ tag, hasOpenTasks: openIds.has(tag.id) }));
 
     // Tags mit offenen Aufgaben stehen vorn; innerhalb bleibt die Reihenfolge.
     return [...used.filter((entry) => entry.hasOpenTasks), ...used.filter((entry) => !entry.hasOpenTasks)];
-  }, [activeTagTasks, tags]);
+  }, [activeTagTasks, tagGroups, tags]);
   const activeFilter = tagFilter && usedTags.some((entry) => entry.tag.id === tagFilter) ? tagFilter : null;
 
   const { sections, completed, completedTagEntries } = useMemo(() => {
@@ -179,7 +182,7 @@ export default function TasksScreen() {
     const fromCompletedTags = activeFilter
       ? []
       : tasks
-          .filter((task) => Boolean(tagsById[task.tagId]?.isCompleted))
+          .filter((task) => isTagCompleted(tagsById[task.tagId], tagGroups))
           .map((task) => ({
             ...plainEntry(task, task.date ? formatShortDateLabel(task.date) : null),
             disableToggle: isTaskRecurring(task),
@@ -194,7 +197,7 @@ export default function TasksScreen() {
         .sort(byTitle),
       completedTagEntries: fromCompletedTags,
     };
-  }, [activeFilter, activeTagTasks, completionLookup, tagsById, tasks]);
+  }, [activeFilter, activeTagTasks, completionLookup, tagGroups, tagsById, tasks]);
 
   const dayEntries = useMemo(
     () => getResolvedTaskOccurrencesForDate(activeTagTasks, selectedDate, completionLookup).map(toEntry),

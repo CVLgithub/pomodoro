@@ -101,7 +101,15 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
   }
 
   return {
-    tagGroups: entries.tagGroups ?? [],
+    tagGroups: (entries.tagGroups ?? []).map((group) => {
+      const isCompleted =
+        group.id === GENERAL_TAG_GROUP_ID ? false : Boolean(group.isCompleted);
+      return {
+        ...group,
+        isCompleted,
+        completedAt: isCompleted ? (group.completedAt ?? group.updatedAt) : null,
+      };
+    }),
     tags: Array.from(normalizedTagsMap.values()),
     tasks: entries.tasks.map((task) => ({
       ...task,
@@ -233,16 +241,24 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
         continue;
       }
       await db.runAsync(
-        `INSERT INTO tag_groups (id, name, createdAt, updatedAt, isDeleted, deletedAt)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO tag_groups (id, name, isCompleted, completedAt, createdAt, updatedAt, isDeleted, deletedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name,
+           isCompleted = excluded.isCompleted,
+           completedAt =
+             CASE
+               WHEN excluded.isCompleted = 0 THEN NULL
+               ELSE COALESCE(tag_groups.completedAt, excluded.completedAt, excluded.updatedAt)
+             END,
            createdAt = excluded.createdAt,
            updatedAt = excluded.updatedAt,
            isDeleted = excluded.isDeleted,
            deletedAt = excluded.deletedAt;`,
         group.id,
         group.name,
+        group.isCompleted ? 1 : 0,
+        group.isCompleted ? (group.completedAt ?? group.updatedAt) : null,
         group.createdAt,
         group.updatedAt,
         group.isDeleted ? 1 : 0,

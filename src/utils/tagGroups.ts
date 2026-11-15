@@ -66,6 +66,23 @@ export const hasDuplicateTagNameInGroup = (
   );
 };
 
+export const isTagCompleted = (
+  tag: Pick<Tag, 'isCompleted' | 'groupId'> | undefined | null,
+  groups: readonly Pick<TagGroup, 'id' | 'isCompleted' | 'isDeleted'>[] = [],
+): boolean => {
+  if (!tag) {
+    return false;
+  }
+  if (tag.isCompleted) {
+    return true;
+  }
+  if (!tag.groupId || tag.groupId === GENERAL_TAG_GROUP_ID) {
+    return false;
+  }
+  const group = groups.find((entry) => entry.id === tag.groupId && !entry.isDeleted);
+  return Boolean(group?.isCompleted);
+};
+
 export const getTagGroupLabel = (groupId?: string | null, groups: TagGroup[] = []): string =>
   groups.find((group) => group.id === groupId)?.name ?? DEFAULT_TAG_GROUP_LABEL;
 
@@ -122,7 +139,13 @@ export const normalizeTagGroupNames = (groupNames: (string | null | undefined)[]
   return Array.from(groupsByCompareKey.values()).sort(compareTagGroupNames);
 };
 
-export const buildTagGroupOptions = (tags: Tag[], groups: TagGroup[] = []): TagGroupOption[] => {
+export const buildTagGroupOptions = (
+  tags: Tag[],
+  groups: TagGroup[] = [],
+  options?: { includeCompleted?: boolean },
+): TagGroupOption[] => {
+  const includeCompleted = Boolean(options?.includeCompleted);
+
   return [
     {
       key: GENERAL_TAG_GROUP_ID,
@@ -130,12 +153,17 @@ export const buildTagGroupOptions = (tags: Tag[], groups: TagGroup[] = []): TagG
       value: GENERAL_TAG_GROUP_ID,
     },
     ...groups
-      .filter((group) => group.id !== GENERAL_TAG_GROUP_ID && !group.isDeleted)
+      .filter(
+        (group) =>
+          group.id !== GENERAL_TAG_GROUP_ID &&
+          !group.isDeleted &&
+          (includeCompleted || !group.isCompleted),
+      )
       .map((group) => ({
-      key: group.id,
-      label: group.name,
-      value: group.id,
-    })),
+        key: group.id,
+        label: group.name,
+        value: group.id,
+      })),
   ];
 };
 

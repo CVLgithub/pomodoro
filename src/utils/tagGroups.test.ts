@@ -46,4 +46,43 @@ describe('tagGroups uniqueness helpers', () => {
     expect(isSameTagName('Übung', 'übung')).toBe(true);
     expect(isSameTagName('Projekt', 'Projekte')).toBe(false);
   });
+
+  it('filters out completed tag groups and detects completed tags via their group', async () => {
+    const { buildTagGroupOptions, isTagCompleted } = await import('./tagGroups');
+    const groups = [
+      {
+        id: 'group-active',
+        name: 'Aktuell',
+        isCompleted: false,
+        completedAt: null,
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+        isDeleted: false,
+        deletedAt: null,
+      },
+      {
+        id: 'group-done',
+        name: 'WS 25/26',
+        isCompleted: true,
+        completedAt: '2026-03-01',
+        createdAt: '2026-01-01',
+        updatedAt: '2026-03-01',
+        isDeleted: false,
+        deletedAt: null,
+      },
+    ];
+
+    expect(buildTagGroupOptions([], groups).map((g) => g.key)).toEqual([
+      GENERAL_TAG_GROUP_ID,
+      'group-active',
+    ]);
+    expect(buildTagGroupOptions([], groups, { includeCompleted: true }).map((g) => g.key)).toEqual([
+      GENERAL_TAG_GROUP_ID,
+      'group-active',
+      'group-done',
+    ]);
+    expect(isTagCompleted({ isCompleted: false, groupId: 'group-done' }, groups)).toBe(true);
+    expect(isTagCompleted({ isCompleted: false, groupId: 'group-active' }, groups)).toBe(false);
+    expect(isTagCompleted({ isCompleted: true, groupId: 'group-active' }, groups)).toBe(true);
+  });
 });
