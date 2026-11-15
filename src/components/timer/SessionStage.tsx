@@ -47,6 +47,7 @@ export const SessionStage = ({
           {eyebrow}
           <Text
             accessibilityLabel={timeLabel}
+            allowFontScaling={false}
             adjustsFontSizeToFit
             numberOfLines={1}
             style={[
@@ -89,6 +90,7 @@ const styles = themedStyles(() => ({
     gap: 12,
   },
   time: {
+    width: '100%',
     color: colors.textPrimary,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],

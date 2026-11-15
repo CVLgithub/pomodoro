@@ -193,6 +193,7 @@ export const GlassTabBar = ({ state, descriptors, emitter, navigateToTab }: Bott
     >
       <Glass
         radius={32}
+        interactive
         style={styles.bar}
         onLayout={(event) =>
           setTabWidth(
