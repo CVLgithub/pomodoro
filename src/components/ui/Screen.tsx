@@ -1,6 +1,6 @@
-import { ReactNode } from 'react';
+import { ReactNode, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
-import { Platform, ScrollView, Text, View } from 'react-native';
+import { Animated, Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -93,6 +93,14 @@ export const Screen = ({
   contentContainerStyle,
 }: ScreenProps) => {
   const clearance = useTabBarClearance();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [webScrolled, setWebScrolled] = useState(false);
+
+  const fadeOpacity = scrollY.interpolate({
+    inputRange: [0, SCROLL_FADE_HEIGHT],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   return (
     <ScreenShell>
@@ -102,8 +110,8 @@ export const Screen = ({
       </View>
       {scroll ? (
         <View style={styles.container}>
-          <ScrollView
-            style={[styles.container, webScrollMask]}
+          <Animated.ScrollView
+            style={[styles.container, webScrolled ? webScrollMask : null]}
             contentContainerStyle={[
               styles.content,
               { paddingBottom: clearance },
@@ -112,11 +120,28 @@ export const Screen = ({
             fadingEdgeLength={24}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              {
+                useNativeDriver: Platform.OS !== 'web',
+                listener:
+                  Platform.OS === 'web'
+                    ? (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+                        const scrolled = event.nativeEvent.contentOffset.y > 1;
+                        setWebScrolled((current) => (current === scrolled ? current : scrolled));
+                      }
+                    : undefined,
+              },
+            )}
           >
             {children}
-          </ScrollView>
+          </Animated.ScrollView>
           {Platform.OS === 'web' ? null : (
-            <View pointerEvents="none" style={[styles.scrollFade, topFadeGradient()]} />
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.scrollFade, topFadeGradient(), { opacity: fadeOpacity }]}
+            />
           )}
         </View>
       ) : (
