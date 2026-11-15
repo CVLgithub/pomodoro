@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import type { ComponentProps } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -9,6 +9,31 @@ import { getPalette, themedStyles } from '../../theme/runtime';
 import { Backdrop } from './Backdrop';
 import { CircleButton } from './CircleButton';
 import { useTabBarClearance } from './GlassTabBar';
+
+const SCROLL_FADE_HEIGHT = 16;
+
+const hexToRgb = (hex: string): string => {
+  const clean = hex.replace('#', '');
+  const value = Number.parseInt(clean, 16);
+  return `${(value >> 16) & 255},${(value >> 8) & 255},${value & 255}`;
+};
+
+const topFadeGradient = (): object => {
+  const rgb = hexToRgb(getPalette().bg);
+  const gradient = `linear-gradient(to bottom, rgba(${rgb},1) 0%, rgba(${rgb},0) 100%)`;
+
+  return Platform.OS === 'web'
+    ? { backgroundImage: gradient }
+    : { experimental_backgroundImage: gradient };
+};
+
+const webScrollMask =
+  Platform.OS === 'web'
+    ? ({
+        maskImage: `linear-gradient(to bottom, transparent 0px, black ${SCROLL_FADE_HEIGHT}px)`,
+        WebkitMaskImage: `linear-gradient(to bottom, transparent 0px, black ${SCROLL_FADE_HEIGHT}px)`,
+      } as object)
+    : null;
 
 interface ScreenShellProps {
   children: ReactNode;
@@ -70,27 +95,44 @@ export const Screen = ({
   const clearance = useTabBarClearance();
 
   return (
-  <ScreenShell>
-    <View style={styles.headerInset}>
-      <ScreenHeader title={title} right={headerRight} onBack={onBack} />
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-    </View>
-    {scroll ? (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[styles.content, { paddingBottom: clearance }, contentContainerStyle]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {children}
-      </ScrollView>
-    ) : (
-      <View style={[styles.container, styles.content, { paddingBottom: clearance }, contentContainerStyle]}>
-        {children}
+    <ScreenShell>
+      <View style={styles.headerInset}>
+        <ScreenHeader title={title} right={headerRight} onBack={onBack} />
+        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
-    )}
-    {footer ? <View style={[styles.footer, { bottom: clearance }]}>{footer}</View> : null}
-  </ScreenShell>
+      {scroll ? (
+        <View style={styles.container}>
+          <ScrollView
+            style={[styles.container, webScrollMask]}
+            contentContainerStyle={[
+              styles.content,
+              { paddingBottom: clearance },
+              contentContainerStyle,
+            ]}
+            fadingEdgeLength={24}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+          {Platform.OS === 'web' ? null : (
+            <View pointerEvents="none" style={[styles.scrollFade, topFadeGradient()]} />
+          )}
+        </View>
+      ) : (
+        <View
+          style={[
+            styles.container,
+            styles.content,
+            { paddingBottom: clearance },
+            contentContainerStyle,
+          ]}
+        >
+          {children}
+        </View>
+      )}
+      {footer ? <View style={[styles.footer, { bottom: clearance }]}>{footer}</View> : null}
+    </ScreenShell>
   );
 };
 
@@ -108,6 +150,7 @@ const styles = themedStyles(() => ({
   headerInset: {
     paddingHorizontal: 16,
     paddingTop: 8,
+    paddingBottom: 8,
   },
   header: {
     minHeight: 44,
@@ -137,9 +180,16 @@ const styles = themedStyles(() => ({
     fontSize: 14,
     lineHeight: 20,
   },
+  scrollFade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCROLL_FADE_HEIGHT,
+  },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 14,
+    paddingTop: SCROLL_FADE_HEIGHT,
     gap: 12,
   },
   footer: {
