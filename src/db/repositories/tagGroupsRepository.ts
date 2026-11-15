@@ -1,6 +1,7 @@
 import { GENERAL_TAG_GROUP_ID, GENERAL_TAG_GROUP_NAME } from '../../constants/config';
 import { TagGroup } from '../../types/tagGroup';
 import { toLocalIsoString } from '../../utils/date';
+import { isSameTagName } from '../../utils/tagGroups';
 import { createUuid } from '../../utils/uuid';
 import { getDatabase } from '../client';
 
@@ -57,10 +58,25 @@ export const deleteTagGroup = async (id: string): Promise<string[]> => {
   }
   const db = await getDatabase();
   const now = toLocalIsoString();
-  const affected = await db.getAllAsync<{ id: string }>(
-    'SELECT id FROM tags WHERE groupId = ? AND isDeleted = 0;',
+  const affected = await db.getAllAsync<{ id: string; name: string }>(
+    'SELECT id, name FROM tags WHERE groupId = ? AND isDeleted = 0;',
     id,
   );
+  if (affected.length > 0) {
+    const generalTags = await db.getAllAsync<{ id: string; name: string }>(
+      'SELECT id, name FROM tags WHERE COALESCE(groupId, ?) = ? AND isDeleted = 0;',
+      GENERAL_TAG_GROUP_ID,
+      GENERAL_TAG_GROUP_ID,
+    );
+    const conflictingTag = affected.find((tag) =>
+      generalTags.some((generalTag) => isSameTagName(generalTag.name, tag.name)),
+    );
+    if (conflictingTag) {
+      throw new Error(
+        `In „${GENERAL_TAG_GROUP_NAME}“ existiert bereits ein Tag mit dem Namen „${conflictingTag.name}“.`,
+      );
+    }
+  }
   await db.execAsync('BEGIN IMMEDIATE TRANSACTION;');
   try {
     await db.runAsync(

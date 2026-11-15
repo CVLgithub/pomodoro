@@ -1,6 +1,7 @@
 import { GENERAL_TAG_GROUP_ID, GENERAL_TAG_ID, GENERAL_TAG_NAME } from '../../constants/config';
 import { Tag, CreateTagInput, UpdateTagInput } from '../../types/tag';
 import { toLocalIsoString } from '../../utils/date';
+import { hasDuplicateTagNameInGroup } from '../../utils/tagGroups';
 import { createUuid } from '../../utils/uuid';
 import { getDatabase } from '../client';
 
@@ -54,6 +55,17 @@ export const getTagById = async (id: string): Promise<Tag | null> => {
   return row ? mapTagRow(row) : null;
 };
 
+const assertUniqueTagNameInGroup = async (
+  name: string,
+  groupId: string | null | undefined,
+  excludeTagId?: string,
+): Promise<void> => {
+  const existingTags = await listTags();
+  if (hasDuplicateTagNameInGroup(existingTags, name, groupId, excludeTagId)) {
+    throw new Error('In dieser Gruppe existiert bereits ein Tag mit diesem Namen');
+  }
+};
+
 export const createTag = async (input: CreateTagInput): Promise<Tag> => {
   const db = await getDatabase();
   const now = toLocalIsoString();
@@ -67,6 +79,8 @@ export const createTag = async (input: CreateTagInput): Promise<Tag> => {
     isDeleted: false,
     deletedAt: null,
   };
+
+  await assertUniqueTagNameInGroup(tag.name, tag.groupId);
 
   await db.runAsync(
     `
@@ -99,6 +113,8 @@ export const updateTag = async (id: string, input: UpdateTagInput): Promise<Tag>
     groupId: input.groupId !== undefined ? input.groupId : existingTag.groupId,
     updatedAt: toLocalIsoString(),
   };
+
+  await assertUniqueTagNameInGroup(updatedTag.name, updatedTag.groupId, updatedTag.id);
 
   await db.runAsync(
     `

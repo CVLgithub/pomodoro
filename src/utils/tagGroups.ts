@@ -46,6 +46,26 @@ export const normalizeCustomTagGroupName = (value?: string | null): string | nul
 export const getTagGroupKey = (groupId?: string | null): string =>
   groupId ?? GENERAL_TAG_GROUP_ID;
 
+export const isSameTagName = (left: string, right: string): boolean =>
+  left.trim().localeCompare(right.trim(), 'de-DE', { sensitivity: 'base' }) === 0;
+
+export const hasDuplicateTagNameInGroup = (
+  tags: readonly Pick<Tag, 'id' | 'name' | 'groupId' | 'isDeleted'>[],
+  name: string,
+  groupId: string | null | undefined,
+  excludeTagId?: string,
+): boolean => {
+  const targetGroupKey = getTagGroupKey(groupId);
+
+  return tags.some(
+    (tag) =>
+      !tag.isDeleted &&
+      tag.id !== excludeTagId &&
+      getTagGroupKey(tag.groupId) === targetGroupKey &&
+      isSameTagName(tag.name, name),
+  );
+};
+
 export const getTagGroupLabel = (groupId?: string | null, groups: TagGroup[] = []): string =>
   groups.find((group) => group.id === groupId)?.name ?? DEFAULT_TAG_GROUP_LABEL;
 

@@ -1,4 +1,4 @@
-import { GENERAL_TAG_ID, GENERAL_TAG_NAME } from '../../constants/config';
+import { GENERAL_TAG_GROUP_ID, GENERAL_TAG_ID, GENERAL_TAG_NAME } from '../../constants/config';
 import { getDatabase } from '../../db/client';
 import { listTagGroups } from '../../db/repositories/tagGroupsRepository';
 import {
@@ -79,7 +79,10 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
   const normalizedTagsMap = new Map<string, EntriesResponse['tags'][number]>();
 
   for (const tag of entries.tags) {
-    const normalizedId = isGeneralTagName(tag.name) ? GENERAL_TAG_ID : tag.id;
+    const isGeneralTag =
+      tag.id === GENERAL_TAG_ID ||
+      (isGeneralTagName(tag.name) && (!tag.groupId || tag.groupId === GENERAL_TAG_GROUP_ID));
+    const normalizedId = isGeneralTag ? GENERAL_TAG_ID : tag.id;
     const normalizedTag = {
       ...tag,
       id: normalizedId,
@@ -243,7 +246,11 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
       );
     }
 
-    for (const tag of entries.tags) {
+    const orderedTags = [...entries.tags].sort(
+      (left, right) => Number(Boolean(right.isDeleted)) - Number(Boolean(left.isDeleted)),
+    );
+
+    for (const tag of orderedTags) {
       const localTag = await db.getFirstAsync<{ updatedAt: string }>(
         'SELECT updatedAt FROM tags WHERE id = ?;',
         tag.id,
