@@ -278,12 +278,14 @@ const styles = themedStyles(() => ({
     fontWeight: '600',
   },
   total: {
+    width: '100%',
     color: colors.textPrimary,
     fontSize: 84,
     lineHeight: 88,
     fontWeight: '700',
     letterSpacing: -4,
     fontVariant: ['tabular-nums'],
+    textAlign: 'center',
   },
   totalDetail: {
     paddingTop: 2,
