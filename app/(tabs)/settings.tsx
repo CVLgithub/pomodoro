@@ -131,12 +131,6 @@ export default function SettingsScreen() {
           value={String(tagCount)}
           onPress={() => router.push(routes.tags)}
         />
-        <ListRow
-          label="Gelöschte Sessions"
-          value={String(deletedSessionCount)}
-          onPress={() => router.push(routes.deletedSessions)}
-          separated
-        />
       </ListGroup>
 
       <ListGroup title="Synchronisierung">
@@ -152,6 +146,12 @@ export default function SettingsScreen() {
           label="Fehlgeschlagene Übertragungen"
           value={String(failedQueueCount)}
           onPress={() => router.push(routes.syncQueue)}
+          separated
+        />
+        <ListRow
+          label="Gelöschte Sessions"
+          value={String(deletedSessionCount)}
+          onPress={() => router.push(routes.deletedSessions)}
           separated
         />
         <ListRow
