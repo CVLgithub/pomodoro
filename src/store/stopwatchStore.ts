@@ -64,12 +64,17 @@ export const useStopwatchStore = create<StopwatchStoreState>((set, get) => ({
   hydrate: async () => {
     let state = await getStopwatchState();
 
-    if (state.selectedTaskId && !(await getTaskById(state.selectedTaskId))) {
-      state = { ...state, selectedTaskId: null };
+    if (state.selectedTaskId) {
+      const selectedTask = await getTaskById(state.selectedTaskId);
+      const taskTag = selectedTask ? await getTagById(selectedTask.tagId) : null;
+      if (!selectedTask || selectedTask.isCompleted || !taskTag || taskTag.isCompleted) {
+        state = { ...state, selectedTaskId: null, selectedTagId: GENERAL_TAG_ID };
+      }
     }
 
-    if (!(await getTagById(state.selectedTagId))) {
-      state = { ...state, selectedTagId: GENERAL_TAG_ID };
+    const selectedTag = await getTagById(state.selectedTagId);
+    if (!selectedTag || selectedTag.isCompleted) {
+      state = { ...state, selectedTaskId: null, selectedTagId: GENERAL_TAG_ID };
     }
 
     await saveStopwatchState(state);
@@ -210,7 +215,11 @@ export const useStopwatchStore = create<StopwatchStoreState>((set, get) => ({
       return;
     }
 
-    const nextState = { ...current, selectedTagId: GENERAL_TAG_ID };
+    const nextState = {
+      ...current,
+      selectedTaskId: null,
+      selectedTagId: GENERAL_TAG_ID,
+    };
     await saveStopwatchState(nextState);
     set({ ...nextState });
   },

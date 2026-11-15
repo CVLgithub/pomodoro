@@ -6,6 +6,7 @@ import { Button } from '../../src/components/ui/Button';
 import { ChoiceChips } from '../../src/components/ui/ChoiceChips';
 import { ColorSwatchPicker } from '../../src/components/ui/ColorSwatchPicker';
 import { EmptyState } from '../../src/components/ui/EmptyState';
+import { ListGroup, ToggleRow } from '../../src/components/ui/List';
 import { Screen } from '../../src/components/ui/Screen';
 import { SectionCard } from '../../src/components/ui/SectionCard';
 import { TextField } from '../../src/components/ui/TextField';
@@ -35,6 +36,7 @@ export default function TagDetailScreen() {
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>(tagPalette[0]);
   const [groupId, setGroupId] = useState<string>(GENERAL_TAG_GROUP_ID);
+  const [isCompleted, setIsCompleted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const openSheet = useOpenSheet();
   const knownGroupIds = useRef<Set<string> | null>(null);
@@ -45,6 +47,7 @@ export default function TagDetailScreen() {
       setName(tag.name);
       setColor(tag.color);
       setGroupId(getTagGroupKey(tag.groupId));
+      setIsCompleted(tag.isCompleted);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tag?.id]);
@@ -86,7 +89,7 @@ export default function TagDetailScreen() {
       if (isNew) {
         await createTag({ name, color, groupId });
       } else if (tag) {
-        await updateTag(tag.id, isGeneral ? { color } : { name, color, groupId });
+        await updateTag(tag.id, isGeneral ? { color } : { name, color, groupId, isCompleted });
       }
       router.back();
     } catch (error) {
@@ -180,6 +183,16 @@ export default function TagDetailScreen() {
           )}
         </View>
       </SectionCard>
+
+      {!isNew && !isGeneral ? (
+        <ListGroup footer="Abgeschlossene Tags werden bei der Auswahl ausgeblendet und unter „Abgeschlossen“ versteckt.">
+          <ToggleRow
+            label="Abgeschlossen"
+            value={isCompleted}
+            onValueChange={setIsCompleted}
+          />
+        </ListGroup>
+      ) : null}
 
       <View style={styles.actions}>
         {!isNew && !isGeneral ? (

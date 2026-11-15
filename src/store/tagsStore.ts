@@ -88,6 +88,12 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
 
     const tag = await updateTagRecord(id, input);
     await get().loadTags();
+    if (tag.isCompleted) {
+      await Promise.all([
+        useTimerStore.getState().handleDeletedTag(id),
+        useStopwatchStore.getState().handleDeletedTag(id),
+      ]);
+    }
     await swallowSyncError(syncManager.pushTag(tag.id, toTagPushPayload(tag)));
     await useSyncStore.getState().loadQueue();
     return tag;

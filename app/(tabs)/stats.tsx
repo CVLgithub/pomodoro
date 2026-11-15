@@ -47,6 +47,7 @@ export default function StatsScreen() {
   const [period, setPeriod] = useState<StatsPeriod>('week');
   const [anchor, setAnchor] = useState(() => new Date());
   const [showAllSessions, setShowAllSessions] = useState(false);
+  const [showCompletedTags, setShowCompletedTags] = useState(false);
 
   const todayKey = getTodayDateKey();
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
@@ -59,6 +60,19 @@ export default function StatsScreen() {
     [range, sessions],
   );
   const summary = useMemo(() => summarizeSessions(periodSessions), [periodSessions]);
+  const { activeTagEntries, completedTagEntries, completedTagMinutes } = useMemo(() => {
+    const active = summary.tags.filter((entry) => !tagsById.get(entry.tagId)?.isCompleted);
+    const completed = summary.tags.filter((entry) =>
+      Boolean(tagsById.get(entry.tagId)?.isCompleted),
+    );
+    const completedMinutes = completed.reduce((sum, entry) => sum + entry.minutes, 0);
+
+    return {
+      activeTagEntries: active,
+      completedTagEntries: completed,
+      completedTagMinutes: completedMinutes,
+    };
+  }, [summary.tags, tagsById]);
   const bars = useMemo(
     () => buildStatsBars(period, anchor, period === 'all' ? sessions : periodSessions, todayKey),
     [anchor, period, periodSessions, sessions, todayKey],
@@ -72,6 +86,28 @@ export default function StatsScreen() {
     setPeriod(next);
     setAnchor(new Date());
     setShowAllSessions(false);
+  };
+
+  const renderTagRow = (entry: (typeof summary.tags)[number]) => {
+    const tag = tagsById.get(entry.tagId);
+
+    return (
+      <View key={entry.tagId} style={styles.tagRow}>
+        <View style={[styles.dot, { backgroundColor: tag?.color ?? colors.textMuted }]} />
+        <Text style={styles.tagName} numberOfLines={1}>
+          {tag?.name ?? 'Ohne Tag'}
+        </Text>
+        <View style={styles.tagTrack}>
+          <View
+            style={[
+              styles.tagFill,
+              { width: `${Math.max(2, Math.round((entry.minutes / maxTagMinutes) * 100))}%` },
+            ]}
+          />
+        </View>
+        <Text style={styles.tagValue}>{formatHoursClock(entry.minutes)}</Text>
+      </View>
+    );
   };
 
   return (
@@ -182,27 +218,31 @@ export default function StatsScreen() {
 
       {summary.tags.length > 0 ? (
         <Glass radius={26} style={styles.tagPanel}>
-          {summary.tags.map((entry) => {
-            const tag = tagsById.get(entry.tagId);
-
-            return (
-              <View key={entry.tagId} style={styles.tagRow}>
-                <View style={[styles.dot, { backgroundColor: tag?.color ?? colors.textMuted }]} />
-                <Text style={styles.tagName} numberOfLines={1}>
-                  {tag?.name ?? 'Ohne Tag'}
+          {activeTagEntries.map(renderTagRow)}
+          {completedTagEntries.length > 0 ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showCompletedTags }}
+                onPress={() => setShowCompletedTags((value) => !value)}
+                style={[
+                  styles.tagRow,
+                  activeTagEntries.length > 0 ? styles.separated : null,
+                ]}
+              >
+                <Ionicons
+                  name={showCompletedTags ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.completedTagToggleLabel} numberOfLines={1}>
+                  Abgeschlossen · {completedTagEntries.length}
                 </Text>
-                <View style={styles.tagTrack}>
-                  <View
-                    style={[
-                      styles.tagFill,
-                      { width: `${Math.max(2, Math.round((entry.minutes / maxTagMinutes) * 100))}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.tagValue}>{formatHoursClock(entry.minutes)}</Text>
-              </View>
-            );
-          })}
+                <Text style={styles.tagValue}>{formatHoursClock(completedTagMinutes)}</Text>
+              </Pressable>
+              {showCompletedTags ? completedTagEntries.map(renderTagRow) : null}
+            </>
+          ) : null}
         </Glass>
       ) : null}
 
@@ -367,6 +407,12 @@ const styles = themedStyles(() => ({
   tagName: {
     width: 84,
     color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  completedTagToggleLabel: {
+    flex: 1,
+    color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '600',
   },

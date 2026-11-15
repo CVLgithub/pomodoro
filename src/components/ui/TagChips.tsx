@@ -33,7 +33,8 @@ export const TagChips = ({ tags, selectedTagId, onSelect }: TagChipsProps) => {
   }
 
   const sections = useMemo(() => {
-    const groups = buildTagGroupOptions(tags, tagGroups);
+    const visibleTags = tags.filter((tag) => !tag.isCompleted || tag.id === selectedTagId);
+    const groups = buildTagGroupOptions(visibleTags, tagGroups);
     const knownKeys = new Set(groups.map((group) => group.key));
     // Tags einer nicht mehr vorhandenen Gruppe landen unter „Allgemein“.
     const keyOf = (tag: Tag) => {
@@ -43,7 +44,7 @@ export const TagChips = ({ tags, selectedTagId, onSelect }: TagChipsProps) => {
 
     return groups
       .map((group) => {
-        const groupTags = tags.filter((tag) => keyOf(tag) === group.key);
+        const groupTags = visibleTags.filter((tag) => keyOf(tag) === group.key);
 
         return {
           key: group.key,
@@ -55,7 +56,7 @@ export const TagChips = ({ tags, selectedTagId, onSelect }: TagChipsProps) => {
         };
       })
       .filter((section) => section.tags.length > 0);
-  }, [leadingTagId, tagGroups, tags]);
+  }, [leadingTagId, selectedTagId, tagGroups, tags]);
 
   const select = (tagId: string) => {
     knownSelection.current = tagId;

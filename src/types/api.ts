@@ -10,7 +10,12 @@ export type PushTaskPayload =
         'createdAt' | 'updatedAt' | 'isDeleted' | 'deletedAt'
     >
   | TaskDeletePayload;
-export type PushTagPayload = Pick<Tag, 'id' | 'name' | 'color' | 'groupId' | 'createdAt' | 'updatedAt' | 'isDeleted' | 'deletedAt'> | TagDeletePayload;
+export type PushTagPayload =
+  | Pick<
+      Tag,
+      'id' | 'name' | 'color' | 'groupId' | 'isCompleted' | 'createdAt' | 'updatedAt' | 'isDeleted' | 'deletedAt'
+    >
+  | TagDeletePayload;
 export type PushTagGroupPayload = Pick<TagGroup, 'id' | 'name' | 'createdAt' | 'updatedAt' | 'isDeleted' | 'deletedAt'>;
 export type PushSessionPayload = Pick<
   Session,
@@ -23,6 +28,8 @@ export interface EntriesTag {
   name: string;
   color: string;
   groupId: string | null;
+  isCompleted?: boolean;
+  completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   isDeleted: boolean;

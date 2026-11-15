@@ -55,10 +55,13 @@ export default function AssignmentSheet() {
 
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const openTasks = useMemo(
-    () => tasks.filter((task) => !task.isCompleted).sort(sortTasks),
-    [tasks],
+    () =>
+      tasks
+        .filter((task) => !task.isCompleted && !tagsById.get(task.tagId)?.isCompleted)
+        .sort(sortTasks),
+    [tagsById, tasks],
   );
-  const hasSelectedTask = tasks.some((task) => task.id === selectedTaskId);
+  const hasSelectedTask = openTasks.some((task) => task.id === selectedTaskId);
 
   // Nach der Wahl schließt das Sheet. Schlägt das Speichern fehl, bleibt es
   // offen, damit die Auswahl wiederholt werden kann.

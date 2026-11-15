@@ -83,10 +83,13 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
       tag.id === GENERAL_TAG_ID ||
       (isGeneralTagName(tag.name) && (!tag.groupId || tag.groupId === GENERAL_TAG_GROUP_ID));
     const normalizedId = isGeneralTag ? GENERAL_TAG_ID : tag.id;
+    const isCompleted = normalizedId === GENERAL_TAG_ID ? false : Boolean(tag.isCompleted);
     const normalizedTag = {
       ...tag,
       id: normalizedId,
       name: normalizedId === GENERAL_TAG_ID ? GENERAL_TAG_NAME : tag.name.trim(),
+      isCompleted,
+      completedAt: isCompleted ? (tag.completedAt ?? tag.updatedAt) : null,
     };
 
     tagIdMap.set(tag.id, normalizedId);
@@ -140,6 +143,7 @@ const matchesTag = (localTag: Tag | undefined, remoteTag: EntriesTag): boolean =
       localTag.name === remoteTag.name &&
       localTag.color === remoteTag.color &&
       localTag.groupId === remoteTag.groupId &&
+      localTag.isCompleted === Boolean(remoteTag.isCompleted) &&
       localTag.createdAt === remoteTag.createdAt &&
       localTag.updatedAt === remoteTag.updatedAt,
   );
@@ -266,12 +270,20 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
       }
       await db.runAsync(
         `
-          INSERT INTO tags (id, name, color, groupId, createdAt, updatedAt, isDeleted, deletedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO tags (
+            id, name, color, groupId, isCompleted, completedAt, createdAt, updatedAt, isDeleted, deletedAt
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             color = excluded.color,
             groupId = excluded.groupId,
+            isCompleted = excluded.isCompleted,
+            completedAt =
+              CASE
+                WHEN excluded.isCompleted = 0 THEN NULL
+                ELSE COALESCE(tags.completedAt, excluded.completedAt, excluded.updatedAt)
+              END,
             createdAt = excluded.createdAt,
             updatedAt = excluded.updatedAt,
             isDeleted = excluded.isDeleted,
@@ -281,6 +293,8 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
         tag.name,
         tag.color,
         tag.groupId,
+        tag.isCompleted ? 1 : 0,
+        tag.isCompleted ? (tag.completedAt ?? tag.updatedAt) : null,
         tag.createdAt,
         tag.updatedAt,
         tag.isDeleted ? 1 : 0,

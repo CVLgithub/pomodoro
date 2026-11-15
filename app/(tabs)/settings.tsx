@@ -35,7 +35,7 @@ export default function SettingsScreen() {
   const startPageRow = useRef<ComponentRef<typeof View>>(null);
   const [startPageMenuAnchor, setStartPageMenuAnchor] = useState<MenuAnchor | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const tagCount = useTagsStore((state) => state.tags.length);
+  const tagCount = useTagsStore((state) => state.tags.filter((tag) => !tag.isCompleted).length);
   const deletedSessionCount = useSessionsStore((state) => state.deletedSessions.length);
   const failedQueueCount = useSyncStore(
     (state) => state.items.filter((item) => item.status === 'failed').length,

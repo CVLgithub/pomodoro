@@ -10,6 +10,8 @@ type TagRow = {
   name: string;
   color: string;
   groupId: string | null;
+  isCompleted: number;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
   isDeleted: number;
@@ -21,6 +23,8 @@ const mapTagRow = (row: TagRow): Tag => ({
   name: row.name,
   color: row.color,
   groupId: row.groupId,
+  isCompleted: Boolean(row.isCompleted),
+  completedAt: row.completedAt,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
   isDeleted: Boolean(row.isDeleted),
@@ -31,10 +35,10 @@ export const listTags = async (): Promise<Tag[]> => {
   const db = await getDatabase();
   const rows = await db.getAllAsync<TagRow>(
     `
-      SELECT id, name, color, groupId, createdAt, updatedAt, isDeleted, deletedAt
+      SELECT id, name, color, groupId, isCompleted, completedAt, createdAt, updatedAt, isDeleted, deletedAt
       FROM tags
       WHERE isDeleted = 0
-      ORDER BY CASE WHEN id = '${GENERAL_TAG_ID}' THEN 0 ELSE 1 END, name COLLATE NOCASE ASC;
+      ORDER BY CASE WHEN id = '${GENERAL_TAG_ID}' THEN 0 ELSE 1 END, isCompleted ASC, name COLLATE NOCASE ASC;
     `,
   );
 
@@ -45,7 +49,7 @@ export const getTagById = async (id: string): Promise<Tag | null> => {
   const db = await getDatabase();
   const row = await db.getFirstAsync<TagRow>(
     `
-      SELECT id, name, color, groupId, createdAt, updatedAt, isDeleted, deletedAt
+      SELECT id, name, color, groupId, isCompleted, completedAt, createdAt, updatedAt, isDeleted, deletedAt
       FROM tags
       WHERE id = ? AND isDeleted = 0;
     `,
@@ -74,6 +78,8 @@ export const createTag = async (input: CreateTagInput): Promise<Tag> => {
     name: input.name.trim(),
     color: input.color,
     groupId: input.groupId ?? GENERAL_TAG_GROUP_ID,
+    isCompleted: false,
+    completedAt: null,
     createdAt: now,
     updatedAt: now,
     isDeleted: false,
@@ -84,8 +90,8 @@ export const createTag = async (input: CreateTagInput): Promise<Tag> => {
 
   await db.runAsync(
     `
-      INSERT INTO tags (id, name, color, groupId, createdAt, updatedAt, isDeleted, deletedAt)
-      VALUES (?, ?, ?, ?, ?, ?, 0, NULL);
+      INSERT INTO tags (id, name, color, groupId, isCompleted, completedAt, createdAt, updatedAt, isDeleted, deletedAt)
+      VALUES (?, ?, ?, ?, 0, NULL, ?, ?, 0, NULL);
     `,
     tag.id,
     tag.name,
@@ -106,12 +112,31 @@ export const updateTag = async (id: string, input: UpdateTagInput): Promise<Tag>
     throw new Error('Tag not found');
   }
 
+  const now = toLocalIsoString();
+  const isGeneral = id === GENERAL_TAG_ID;
+  const nextIsCompleted = isGeneral ? false : (input.isCompleted ?? existingTag.isCompleted);
+  const nextCompletedAt = isGeneral
+    ? null
+    : input.completedAt !== undefined
+      ? input.completedAt
+      : input.isCompleted === undefined || input.isCompleted === existingTag.isCompleted
+        ? existingTag.completedAt
+        : nextIsCompleted
+          ? now
+          : null;
+
   const updatedTag: Tag = {
     ...existingTag,
-    name: input.name?.trim() ?? existingTag.name,
+    name: isGeneral ? existingTag.name : (input.name?.trim() ?? existingTag.name),
     color: input.color ?? existingTag.color,
-    groupId: input.groupId !== undefined ? input.groupId : existingTag.groupId,
-    updatedAt: toLocalIsoString(),
+    groupId: isGeneral
+      ? existingTag.groupId
+      : input.groupId !== undefined
+        ? input.groupId
+        : existingTag.groupId,
+    isCompleted: nextIsCompleted,
+    completedAt: nextCompletedAt,
+    updatedAt: now,
   };
 
   await assertUniqueTagNameInGroup(updatedTag.name, updatedTag.groupId, updatedTag.id);
@@ -119,12 +144,14 @@ export const updateTag = async (id: string, input: UpdateTagInput): Promise<Tag>
   await db.runAsync(
     `
       UPDATE tags
-      SET name = ?, color = ?, groupId = ?, updatedAt = ?, isDeleted = 0, deletedAt = NULL
+      SET name = ?, color = ?, groupId = ?, isCompleted = ?, completedAt = ?, updatedAt = ?, isDeleted = 0, deletedAt = NULL
       WHERE id = ?;
     `,
     updatedTag.name,
     updatedTag.color,
     updatedTag.groupId,
+    updatedTag.isCompleted ? 1 : 0,
+    updatedTag.completedAt,
     updatedTag.updatedAt,
     updatedTag.id,
   );

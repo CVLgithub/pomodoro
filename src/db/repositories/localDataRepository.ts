@@ -60,7 +60,7 @@ export const clearLocalDataAndQueue = async (): Promise<void> => {
       GENERAL_TAG_GROUP_ID,
     );
     await transaction.runAsync(
-      'UPDATE tags SET name = ?, color = ?, groupId = ?, updatedAt = ?, isDeleted = 0, deletedAt = NULL WHERE id = ?;',
+      'UPDATE tags SET name = ?, color = ?, groupId = ?, isCompleted = 0, completedAt = NULL, updatedAt = ?, isDeleted = 0, deletedAt = NULL WHERE id = ?;',
       GENERAL_TAG_NAME,
       '#5EA2FF',
       GENERAL_TAG_GROUP_ID,

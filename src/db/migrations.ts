@@ -252,6 +252,23 @@ const migrations: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 11,
+    apply: async (db) => {
+      const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tags);');
+      if (!columns.some((column) => column.name === 'isCompleted')) {
+        await db.execAsync(
+          'ALTER TABLE tags ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0;',
+        );
+      }
+      if (!columns.some((column) => column.name === 'completedAt')) {
+        await db.execAsync('ALTER TABLE tags ADD COLUMN completedAt TEXT;');
+      }
+      await db.execAsync(
+        'CREATE INDEX IF NOT EXISTS idx_tags_is_completed ON tags (isCompleted);',
+      );
+    },
+  },
 ] as const;
 
 export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> => {

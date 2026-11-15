@@ -277,7 +277,7 @@ export default function TaskDetailScreen() {
         </View>
       </View>
 
-      {isNew || isCompleted ? null : (
+      {isNew || isCompleted || tags.find((entry) => entry.id === tagId)?.isCompleted ? null : (
         <Button label="Im Timer verwenden" variant="secondary" onPress={() => void useInTimer()} />
       )}
 

@@ -90,6 +90,7 @@ export default function TasksScreen() {
   const [view, setView] = useState<TasksView>('list');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showCompletedTagTasks, setShowCompletedTagTasks] = useState(false);
   const [draft, setDraft] = useState('');
   const tasks = useTasksStore((state) => state.tasks);
   const occurrenceCompletions = useTasksStore((state) => state.occurrenceCompletions);
@@ -104,28 +105,36 @@ export default function TasksScreen() {
     () => Object.fromEntries(tags.map((tag) => [tag.id, tag])) as Record<string, Tag | undefined>,
     [tags],
   );
+  const activeTagTasks = useMemo(
+    () => tasks.filter((task) => !tagsById[task.tagId]?.isCompleted),
+    [tagsById, tasks],
+  );
   const completionLookup = useMemo(
     () => buildTaskOccurrenceCompletionLookup(occurrenceCompletions),
     [occurrenceCompletions],
   );
   const usedTags = useMemo(() => {
-    const usedIds = new Set(tasks.map((task) => task.tagId));
+    const usedIds = new Set(activeTagTasks.map((task) => task.tagId));
     // Wiederkehrende Aufgaben sind nie endgültig erledigt und zählen als offen.
     const openIds = new Set(
-      tasks.filter((task) => isTaskRecurring(task) || !task.isCompleted).map((task) => task.tagId),
+      activeTagTasks
+        .filter((task) => isTaskRecurring(task) || !task.isCompleted)
+        .map((task) => task.tagId),
     );
     const used = tags
-      .filter((tag) => usedIds.has(tag.id))
+      .filter((tag) => !tag.isCompleted && usedIds.has(tag.id))
       .map((tag) => ({ tag, hasOpenTasks: openIds.has(tag.id) }));
 
     // Tags mit offenen Aufgaben stehen vorn; innerhalb bleibt die Reihenfolge.
     return [...used.filter((entry) => entry.hasOpenTasks), ...used.filter((entry) => !entry.hasOpenTasks)];
-  }, [tags, tasks]);
+  }, [activeTagTasks, tags]);
   const activeFilter = tagFilter && usedTags.some((entry) => entry.tag.id === tagFilter) ? tagFilter : null;
 
-  const { sections, completed } = useMemo(() => {
+  const { sections, completed, completedTagEntries } = useMemo(() => {
     const todayKey = getTodayDateKey();
-    const visible = activeFilter ? tasks.filter((task) => task.tagId === activeFilter) : tasks;
+    const visible = activeFilter
+      ? activeTagTasks.filter((task) => task.tagId === activeFilter)
+      : activeTagTasks;
     const today = getResolvedTaskOccurrencesForDate(visible, todayKey, completionLookup)
       .map(toEntry)
       .filter((entry) => !entry.isCompleted);
@@ -167,24 +176,35 @@ export default function TasksScreen() {
       },
     ];
 
+    const fromCompletedTags = activeFilter
+      ? []
+      : tasks
+          .filter((task) => Boolean(tagsById[task.tagId]?.isCompleted))
+          .map((task) => ({
+            ...plainEntry(task, task.date ? formatShortDateLabel(task.date) : null),
+            disableToggle: isTaskRecurring(task),
+          }))
+          .sort(byTitle);
+
     return {
       sections: result.filter((section) => section.entries.length > 0),
       completed: visible
         .filter((task) => task.isCompleted && !isTaskRecurring(task))
         .map((task) => plainEntry(task, null))
         .sort(byTitle),
+      completedTagEntries: fromCompletedTags,
     };
-  }, [activeFilter, completionLookup, tasks]);
+  }, [activeFilter, activeTagTasks, completionLookup, tagsById, tasks]);
 
   const dayEntries = useMemo(
-    () => getResolvedTaskOccurrencesForDate(tasks, selectedDate, completionLookup).map(toEntry),
-    [completionLookup, selectedDate, tasks],
+    () => getResolvedTaskOccurrencesForDate(activeTagTasks, selectedDate, completionLookup).map(toEntry),
+    [activeTagTasks, completionLookup, selectedDate],
   );
   const markedDates = useMemo(() => {
     const monthStart = formatDateKey(getMonthStart(parseDateKey(visibleMonthDate)));
     const monthEnd = formatDateKey(getMonthEnd(parseDateKey(visibleMonthDate)));
 
-    return getResolvedTaskOccurrencesInRange(tasks, monthStart, monthEnd, completionLookup).reduce<
+    return getResolvedTaskOccurrencesInRange(activeTagTasks, monthStart, monthEnd, completionLookup).reduce<
       Record<string, { marked?: boolean; dotColor?: string }>
     >((accumulator, occurrence) => {
       accumulator[occurrence.occurrenceDate] = {
@@ -193,7 +213,7 @@ export default function TasksScreen() {
       };
       return accumulator;
     }, {});
-  }, [completionLookup, tagsById, tasks, visibleMonthDate]);
+  }, [activeTagTasks, completionLookup, tagsById, visibleMonthDate]);
 
   const reportError = (title: string) => (error: unknown) => {
     Alert.alert(title, error instanceof Error ? error.message : 'Unbekannter Fehler');
@@ -292,13 +312,13 @@ export default function TasksScreen() {
             </ScrollView>
           ) : null}
 
-          {sections.length === 0 && completed.length === 0 ? (
+          {sections.length === 0 && completed.length === 0 && completedTagEntries.length === 0 ? (
             <EmptyState
               title="Noch keine Aufgaben"
               description="Lege oben rechts die erste Aufgabe an."
             />
           ) : null}
-          {sections.length === 0 && completed.length > 0 ? (
+          {sections.length === 0 && (completed.length > 0 || completedTagEntries.length > 0) ? (
             <EmptyState title="Alles erledigt" description="Es ist keine Aufgabe mehr offen." />
           ) : null}
 
@@ -329,6 +349,29 @@ export default function TasksScreen() {
                 </Glass>
               </Pressable>
               {showCompleted ? <Glass radius={26}>{renderRows(completed)}</Glass> : null}
+            </View>
+          ) : null}
+
+          {completedTagEntries.length > 0 ? (
+            <View style={styles.section}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showCompletedTagTasks }}
+                onPress={() => setShowCompletedTagTasks((value) => !value)}
+              >
+                <Glass radius={25} style={styles.completedToggle}>
+                  <Text style={styles.completedLabel}>Abgeschlossen</Text>
+                  <Text style={styles.completedCount}>{completedTagEntries.length}</Text>
+                  <Ionicons
+                    name={showCompletedTagTasks ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                </Glass>
+              </Pressable>
+              {showCompletedTagTasks ? (
+                <Glass radius={26}>{renderRows(completedTagEntries)}</Glass>
+              ) : null}
             </View>
           ) : null}
         </>

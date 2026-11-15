@@ -3,6 +3,8 @@ export interface Tag {
   name: string;
   color: string;
   groupId: string | null;
+  isCompleted: boolean;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
   isDeleted: boolean;
@@ -19,6 +21,8 @@ export interface UpdateTagInput {
   name?: string;
   color?: string;
   groupId?: string | null;
+  isCompleted?: boolean;
+  completedAt?: string | null;
 }
 
 export interface TagDeletePayload {
