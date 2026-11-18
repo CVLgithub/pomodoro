@@ -17,7 +17,7 @@ interface SyncQueueCardProps {
 const ENTITY_LABELS: Record<SyncQueueItem['entityType'], string> = {
   task: 'Aufgabe',
   tag: 'Tag',
-  tagGroup: 'Gruppe',
+  tagGroup: 'Projekt',
   session: 'Session',
 };
 

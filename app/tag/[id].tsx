@@ -165,7 +165,7 @@ export default function TagDetailScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Gruppe</Text>
+          <Text style={styles.label}>Projekt</Text>
           <ChoiceChips
             options={groupOptions}
             selected={[groupId]}
@@ -175,7 +175,7 @@ export default function TagDetailScreen() {
           {isGeneral ? null : (
             <View style={styles.inlineAction}>
               <Button
-                label="Neue Gruppe"
+                label="Neues Projekt"
                 variant="secondary"
                 compact
                 onPress={() => {

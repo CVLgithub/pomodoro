@@ -477,8 +477,8 @@ const buildPendingDownsyncEntries = (
       entityType: 'tagGroup',
       entityId: group.id,
       title: groupName,
-      subtitle: 'Gruppe · Neu',
-      detail: 'Leere Tag-Gruppe',
+      subtitle: 'Projekt · Neu',
+      detail: 'Leeres Projekt',
       statusLabel: 'Neu',
     });
   }
@@ -495,7 +495,7 @@ const buildPendingDownsyncEntries = (
       entityId: tag.id,
       title: tag.name,
       subtitle: `Tag · ${buildStatusLabel(Boolean(localTag))}`,
-      detail: `Gruppe ${tag.groupId ?? 'Allgemein'} - Farbe ${tag.color}`,
+      detail: `Projekt ${tag.groupId ?? 'Allgemein'} - Farbe ${tag.color}`,
       statusLabel: buildStatusLabel(Boolean(localTag)),
     });
   }
@@ -647,7 +647,7 @@ const buildImportSubset = async (
     const remoteGroup = entries.tagGroups.find((group) => group.id === entityId);
 
     if (!remoteGroup) {
-      throw new Error('Die ausgewählte Gruppe wurde nicht mehr gefunden.');
+      throw new Error('Das ausgewählte Projekt wurde nicht mehr gefunden.');
     }
 
     ensureTagGroup(remoteGroup.name);

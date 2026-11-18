@@ -68,7 +68,7 @@ export const setTagGroupCompleted = async (
   const db = await getDatabase();
   const existing = await getTagGroupById(id);
   if (!existing) {
-    throw new Error('Tag-Gruppe nicht gefunden');
+    throw new Error('Projekt nicht gefunden');
   }
 
   const now = toLocalIsoString();

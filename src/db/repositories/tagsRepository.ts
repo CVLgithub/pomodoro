@@ -66,7 +66,7 @@ const assertUniqueTagNameInGroup = async (
 ): Promise<void> => {
   const existingTags = await listTags();
   if (hasDuplicateTagNameInGroup(existingTags, name, groupId, excludeTagId)) {
-    throw new Error('In dieser Gruppe existiert bereits ein Tag mit diesem Namen');
+    throw new Error('In diesem Projekt existiert bereits ein Tag mit diesem Namen');
   }
 };
 

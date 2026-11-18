@@ -166,7 +166,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     const groupName = normalizeCustomTagGroupName(value);
 
     if (!groupName) {
-      throw new Error('Gruppenname ist erforderlich');
+      throw new Error('Projektname ist erforderlich');
     }
 
     const existingGroups = get().tagGroups;
@@ -176,7 +176,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     );
 
     if (alreadyExists) {
-      throw new Error('Diese Gruppe existiert bereits');
+      throw new Error('Dieses Projekt existiert bereits');
     }
 
     const group = await createTagGroupRecord(groupName);
@@ -232,7 +232,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     const group = get().tagGroups.find((entry) => entry.id === groupId);
 
     if (!group) {
-      throw new Error('Tag-Gruppe nicht gefunden');
+      throw new Error('Projekt nicht gefunden');
     }
 
     // Das Repository hängt die Tags der Gruppe auf "Allgemein" um.

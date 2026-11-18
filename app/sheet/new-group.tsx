@@ -38,12 +38,12 @@ export default function NewGroupSheet() {
       close();
     } catch (saveError) {
       setIsSaving(false);
-      setError(saveError instanceof Error ? saveError.message : 'Gruppe konnte nicht erstellt werden');
+      setError(saveError instanceof Error ? saveError.message : 'Projekt konnte nicht erstellt werden');
     }
   };
 
   return (
-    <Sheet title="Neue Gruppe">
+    <Sheet title="Neues Projekt">
       <TextField
         ref={nameInput}
         label="Name"
@@ -61,7 +61,7 @@ export default function NewGroupSheet() {
           {error}
         </Text>
       ) : null}
-      <Button label="Gruppe erstellen" onPress={() => void save()} disabled={!name.trim() || isSaving} />
+      <Button label="Projekt erstellen" onPress={() => void save()} disabled={!name.trim() || isSaving} />
     </Sheet>
   );
 }

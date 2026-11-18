@@ -82,8 +82,8 @@ export default function TagsScreen() {
     } catch (error) {
       Alert.alert(
         isCompleted
-          ? 'Gruppe konnte nicht abgeschlossen werden'
-          : 'Gruppe konnte nicht wieder geöffnet werden',
+          ? 'Projekt konnte nicht abgeschlossen werden'
+          : 'Projekt konnte nicht wieder geöffnet werden',
         error instanceof Error ? error.message : 'Unbekannter Fehler',
       );
     }
@@ -91,10 +91,10 @@ export default function TagsScreen() {
 
   const removeGroup = async (group: (typeof groups)[number]) => {
     const confirmed = await confirmAction({
-      title: `Gruppe „${group.label}“ löschen?`,
+      title: `Projekt „${group.label}“ löschen?`,
       message:
         group.totalCount === 0
-          ? 'Die Gruppe enthält keine Tags.'
+          ? 'Das Projekt enthält keine Tags.'
           : group.totalCount === 1
             ? 'Der enthaltene Tag wird nach „Allgemein“ verschoben.'
             : `Die ${group.totalCount} enthaltenen Tags werden nach „Allgemein“ verschoben.`,
@@ -110,7 +110,7 @@ export default function TagsScreen() {
       await loadTags();
     } catch (error) {
       Alert.alert(
-        'Gruppe konnte nicht gelöscht werden',
+        'Projekt konnte nicht gelöscht werden',
         error instanceof Error ? error.message : 'Unbekannter Fehler',
       );
     }
@@ -118,7 +118,7 @@ export default function TagsScreen() {
 
   return (
     <Screen
-      title="Tags und Gruppen"
+      title="Tags und Projekte"
       onBack={() => router.back()}
       headerRight={
         <CircleButton
@@ -147,14 +147,14 @@ export default function TagsScreen() {
           {group.id === GENERAL_TAG_GROUP_ID ? null : (
             <>
               <ListRow
-                label="Gruppe abschließen"
+                label="Projekt abschließen"
                 icon="checkmark-circle-outline"
                 tone="action"
                 separated
                 onPress={() => void toggleGroupCompleted(group.id, true)}
               />
               <ListRow
-                label="Gruppe löschen"
+                label="Projekt löschen"
                 icon="trash-outline"
                 tone="danger"
                 separated
@@ -166,7 +166,7 @@ export default function TagsScreen() {
       ))}
 
       <Button
-        label="Neue Gruppe"
+        label="Neues Projekt"
         variant="secondary"
         onPress={() => openSheet(routes.newGroupSheet)}
       />
@@ -206,14 +206,14 @@ export default function TagsScreen() {
                     ))
                   )}
                   <ListRow
-                    label="Gruppe wieder öffnen"
+                    label="Projekt wieder öffnen"
                     icon="refresh-outline"
                     tone="action"
                     separated
                     onPress={() => void toggleGroupCompleted(group.id, false)}
                   />
                   <ListRow
-                    label="Gruppe löschen"
+                    label="Projekt löschen"
                     icon="trash-outline"
                     tone="danger"
                     separated

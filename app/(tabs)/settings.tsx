@@ -127,7 +127,7 @@ export default function SettingsScreen() {
 
       <ListGroup>
         <ListRow
-          label="Tags und Gruppen"
+          label="Tags und Projekte"
           value={String(tagCount)}
           onPress={() => router.push(routes.tags)}
         />
