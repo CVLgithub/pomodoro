@@ -16,7 +16,7 @@ import { themedStyles } from '../../src/theme/runtime';
 import { Task } from '../../src/types/task';
 import { formatShortDateLabel } from '../../src/utils/date';
 import { haptics } from '../../src/utils/haptics';
-import { formatTagWithGroup } from '../../src/utils/tagGroups';
+import { formatTagWithGroup, isTagCompleted } from '../../src/utils/tagGroups';
 import { formatTaskRecurrenceDays, isTaskRecurring } from '../../src/utils/taskRecurrence';
 
 const sortTasks = (left: Task, right: Task) => {
@@ -55,10 +55,13 @@ export default function AssignmentSheet() {
 
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const openTasks = useMemo(
-    () => tasks.filter((task) => !task.isCompleted).sort(sortTasks),
-    [tasks],
+    () =>
+      tasks
+        .filter((task) => !task.isCompleted && !isTagCompleted(tagsById.get(task.tagId), tagGroups))
+        .sort(sortTasks),
+    [tagGroups, tagsById, tasks],
   );
-  const hasSelectedTask = tasks.some((task) => task.id === selectedTaskId);
+  const hasSelectedTask = openTasks.some((task) => task.id === selectedTaskId);
 
   // Nach der Wahl schließt das Sheet. Schlägt das Speichern fehl, bleibt es
   // offen, damit die Auswahl wiederholt werden kann.

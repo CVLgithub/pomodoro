@@ -129,6 +129,7 @@ export default function RootLayout() {
         <Stack.Screen name="sheet/timer-mode" options={sheetOptions} dangerouslySingular />
         <Stack.Screen name="sheet/manual-session" options={sheetOptions} dangerouslySingular />
         <Stack.Screen name="sheet/session/[id]" options={sheetOptions} dangerouslySingular />
+        <Stack.Screen name="sheet/stats-tag/[id]" options={sheetOptions} dangerouslySingular />
         <Stack.Screen name="sheet/new-group" options={sheetOptions} dangerouslySingular />
       </Stack>
       {!userId && !isDevUserId && !onboardingDismissed ? (

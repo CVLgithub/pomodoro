@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 
-import { DEFAULT_BACKEND_URL } from '../constants/config';
+import { DEFAULT_BACKEND_URL, GENERAL_TAG_GROUP_ID } from '../constants/config';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../constants/notifications';
 import { toLocalIsoString } from '../utils/date';
 import { buildSchemaStatements } from './schema';
@@ -13,6 +13,30 @@ type Migration = {
   version: number;
   statements?: () => string[];
   apply?: (db: SQLite.SQLiteDatabase) => Promise<void>;
+};
+
+const ensureTagAndGroupCompletionColumns = async (db: SQLite.SQLiteDatabase): Promise<void> => {
+  const tagColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tags);');
+  if (!tagColumns.some((column) => column.name === 'isCompleted')) {
+    await db.execAsync('ALTER TABLE tags ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0;');
+  }
+  if (!tagColumns.some((column) => column.name === 'completedAt')) {
+    await db.execAsync('ALTER TABLE tags ADD COLUMN completedAt TEXT;');
+  }
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tags_is_completed ON tags (isCompleted);');
+
+  const groupColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tag_groups);');
+  if (!groupColumns.some((column) => column.name === 'isCompleted')) {
+    await db.execAsync(
+      'ALTER TABLE tag_groups ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0;',
+    );
+  }
+  if (!groupColumns.some((column) => column.name === 'completedAt')) {
+    await db.execAsync('ALTER TABLE tag_groups ADD COLUMN completedAt TEXT;');
+  }
+  await db.execAsync(
+    'CREATE INDEX IF NOT EXISTS idx_tag_groups_is_completed ON tag_groups (isCompleted);',
+  );
 };
 
 const migrations: readonly Migration[] = [
@@ -208,7 +232,61 @@ const migrations: readonly Migration[] = [
       }
     },
   },
+  {
+    // Tag-Namen sind nur noch innerhalb derselben Gruppe eindeutig.
+    version: 10,
+    apply: async (db) => {
+      const tableRow = await db.getFirstAsync<{ sql: string | null }>(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tags';",
+      );
+      if (
+        tableRow?.sql &&
+        /name\s+TEXT\s+NOT\s+NULL\s+COLLATE\s+NOCASE\s+UNIQUE/i.test(tableRow.sql)
+      ) {
+        const columns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tags);');
+        const columnList = columns.map((column) => column.name).join(', ');
+        const createNewTableSql = tableRow.sql
+          .replace(
+            /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?tags["`]?/i,
+            'CREATE TABLE tags_new',
+          )
+          .replace(
+            /name\s+TEXT\s+NOT\s+NULL\s+COLLATE\s+NOCASE\s+UNIQUE/i,
+            'name TEXT NOT NULL COLLATE NOCASE',
+          );
+
+        await db.execAsync(`${createNewTableSql};`);
+        await db.execAsync(
+          `INSERT INTO tags_new (${columnList}) SELECT ${columnList} FROM tags;`,
+        );
+        await db.execAsync('DROP TABLE tags;');
+        await db.execAsync('ALTER TABLE tags_new RENAME TO tags;');
+        await db.execAsync('CREATE INDEX IF NOT EXISTS idx_tags_is_deleted ON tags (isDeleted);');
+        if (columns.some((column) => column.name === 'isCompleted')) {
+          await db.execAsync(
+            'CREATE INDEX IF NOT EXISTS idx_tags_is_completed ON tags (isCompleted);',
+          );
+        }
+      }
+
+      await db.execAsync(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_group_name_unique
+        ON tags (COALESCE(groupId, '${GENERAL_TAG_GROUP_ID}'), name COLLATE NOCASE)
+        WHERE isDeleted = 0;
+      `);
+    },
+  },
+  {
+    version: 11,
+    apply: ensureTagAndGroupCompletionColumns,
+  },
+  {
+    version: 12,
+    apply: ensureTagAndGroupCompletionColumns,
+  },
 ] as const;
+
+export const LATEST_MIGRATION_VERSION = migrations[migrations.length - 1].version;
 
 export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> => {
   const row = await db.getFirstAsync<UserVersionRow>('PRAGMA user_version;');
@@ -219,6 +297,7 @@ export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> =>
       continue;
     }
 
+    await db.execAsync('PRAGMA foreign_keys = OFF;');
     await db.execAsync('BEGIN IMMEDIATE TRANSACTION;');
 
     try {
@@ -235,6 +314,8 @@ export const runMigrations = async (db: SQLite.SQLiteDatabase): Promise<void> =>
     } catch (error) {
       await db.execAsync('ROLLBACK;');
       throw error;
+    } finally {
+      await db.execAsync('PRAGMA foreign_keys = ON;');
     }
   }
 };

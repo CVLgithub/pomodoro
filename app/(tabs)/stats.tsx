@@ -12,9 +12,10 @@ import { colors } from '../../src/constants/colors';
 import { routes } from '../../src/constants/routes';
 import { useOpenSheet } from '../../src/hooks/useSheet';
 import { useSessionsStore } from '../../src/store/sessionsStore';
+import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { themedStyles } from '../../src/theme/runtime';
-import { formatShortDateLabel, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
+import { formatDateKey, formatShortDateLabel, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
 import {
   StatsPeriod,
   buildStatsBars,
@@ -25,6 +26,7 @@ import {
   shiftStatsAnchor,
   summarizeSessions,
 } from '../../src/utils/stats';
+import { isTagCompleted } from '../../src/utils/tagGroups';
 
 const PERIOD_OPTIONS = [
   { value: 'day', label: 'Tag' },
@@ -44,11 +46,14 @@ export default function StatsScreen() {
   const openSheet = useOpenSheet();
   const sessions = useSessionsStore((state) => state.sessions);
   const tags = useTagsStore((state) => state.tags);
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
   const [period, setPeriod] = useState<StatsPeriod>('week');
   const [anchor, setAnchor] = useState(() => new Date());
   const [showAllSessions, setShowAllSessions] = useState(false);
+  const [showCompletedTags, setShowCompletedTags] = useState(false);
 
   const todayKey = getTodayDateKey();
+  const anchorKey = useMemo(() => formatDateKey(anchor), [anchor]);
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const range = useMemo(() => getStatsRange(period, anchor), [anchor, period]);
   const periodSessions = useMemo(
@@ -59,6 +64,21 @@ export default function StatsScreen() {
     [range, sessions],
   );
   const summary = useMemo(() => summarizeSessions(periodSessions), [periodSessions]);
+  const { activeTagEntries, completedTagEntries, completedTagMinutes } = useMemo(() => {
+    const active = summary.tags.filter(
+      (entry) => !isTagCompleted(tagsById.get(entry.tagId), tagGroups),
+    );
+    const completed = summary.tags.filter((entry) =>
+      isTagCompleted(tagsById.get(entry.tagId), tagGroups),
+    );
+    const completedMinutes = completed.reduce((sum, entry) => sum + entry.minutes, 0);
+
+    return {
+      activeTagEntries: active,
+      completedTagEntries: completed,
+      completedTagMinutes: completedMinutes,
+    };
+  }, [summary.tags, tagGroups, tagsById]);
   const bars = useMemo(
     () => buildStatsBars(period, anchor, period === 'all' ? sessions : periodSessions, todayKey),
     [anchor, period, periodSessions, sessions, todayKey],
@@ -72,6 +92,35 @@ export default function StatsScreen() {
     setPeriod(next);
     setAnchor(new Date());
     setShowAllSessions(false);
+  };
+
+  const renderTagRow = (entry: (typeof summary.tags)[number]) => {
+    const tag = tagsById.get(entry.tagId);
+
+    return (
+      <Pressable
+        key={entry.tagId}
+        accessibilityRole="button"
+        accessibilityHint="Zeit nach Aufgaben anzeigen"
+        onPress={() => openSheet(routes.statsTagSheet(entry.tagId, period, anchorKey))}
+        style={({ pressed }) => [styles.tagRow, pressed ? styles.tagRowPressed : null]}
+      >
+        <View style={[styles.dot, { backgroundColor: tag?.color ?? colors.textMuted }]} />
+        <Text style={styles.tagName} numberOfLines={1}>
+          {tag?.name ?? 'Ohne Tag'}
+        </Text>
+        <View style={styles.tagTrack}>
+          <View
+            style={[
+              styles.tagFill,
+              { width: `${Math.max(2, Math.round((entry.minutes / maxTagMinutes) * 100))}%` },
+            ]}
+          />
+        </View>
+        <Text style={styles.tagValue}>{formatHoursClock(entry.minutes)}</Text>
+        <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+      </Pressable>
+    );
   };
 
   return (
@@ -182,27 +231,31 @@ export default function StatsScreen() {
 
       {summary.tags.length > 0 ? (
         <Glass radius={26} style={styles.tagPanel}>
-          {summary.tags.map((entry) => {
-            const tag = tagsById.get(entry.tagId);
-
-            return (
-              <View key={entry.tagId} style={styles.tagRow}>
-                <View style={[styles.dot, { backgroundColor: tag?.color ?? colors.textMuted }]} />
-                <Text style={styles.tagName} numberOfLines={1}>
-                  {tag?.name ?? 'Ohne Tag'}
+          {activeTagEntries.map(renderTagRow)}
+          {completedTagEntries.length > 0 ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showCompletedTags }}
+                onPress={() => setShowCompletedTags((value) => !value)}
+                style={[
+                  styles.tagRow,
+                  activeTagEntries.length > 0 ? styles.separated : null,
+                ]}
+              >
+                <Ionicons
+                  name={showCompletedTags ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.completedTagToggleLabel} numberOfLines={1}>
+                  Abgeschlossen · {completedTagEntries.length}
                 </Text>
-                <View style={styles.tagTrack}>
-                  <View
-                    style={[
-                      styles.tagFill,
-                      { width: `${Math.max(2, Math.round((entry.minutes / maxTagMinutes) * 100))}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.tagValue}>{formatHoursClock(entry.minutes)}</Text>
-              </View>
-            );
-          })}
+                <Text style={styles.tagValue}>{formatHoursClock(completedTagMinutes)}</Text>
+              </Pressable>
+              {showCompletedTags ? completedTagEntries.map(renderTagRow) : null}
+            </>
+          ) : null}
         </Glass>
       ) : null}
 
@@ -359,6 +412,9 @@ const styles = themedStyles(() => ({
     alignItems: 'center',
     gap: 10,
   },
+  tagRowPressed: {
+    opacity: 0.6,
+  },
   dot: {
     width: 10,
     height: 10,
@@ -367,6 +423,12 @@ const styles = themedStyles(() => ({
   tagName: {
     width: 84,
     color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  completedTagToggleLabel: {
+    flex: 1,
+    color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '600',
   },

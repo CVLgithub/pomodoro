@@ -1,4 +1,4 @@
-import { GENERAL_TAG_ID, GENERAL_TAG_NAME } from '../../constants/config';
+import { GENERAL_TAG_GROUP_ID, GENERAL_TAG_ID, GENERAL_TAG_NAME } from '../../constants/config';
 import { getDatabase } from '../../db/client';
 import { listTagGroups } from '../../db/repositories/tagGroupsRepository';
 import {
@@ -79,11 +79,17 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
   const normalizedTagsMap = new Map<string, EntriesResponse['tags'][number]>();
 
   for (const tag of entries.tags) {
-    const normalizedId = isGeneralTagName(tag.name) ? GENERAL_TAG_ID : tag.id;
+    const isGeneralTag =
+      tag.id === GENERAL_TAG_ID ||
+      (isGeneralTagName(tag.name) && (!tag.groupId || tag.groupId === GENERAL_TAG_GROUP_ID));
+    const normalizedId = isGeneralTag ? GENERAL_TAG_ID : tag.id;
+    const isCompleted = normalizedId === GENERAL_TAG_ID ? false : Boolean(tag.isCompleted);
     const normalizedTag = {
       ...tag,
       id: normalizedId,
       name: normalizedId === GENERAL_TAG_ID ? GENERAL_TAG_NAME : tag.name.trim(),
+      isCompleted,
+      completedAt: isCompleted ? (tag.completedAt ?? tag.updatedAt) : null,
     };
 
     tagIdMap.set(tag.id, normalizedId);
@@ -95,7 +101,15 @@ const normalizeEntries = (entries: EntriesResponse): NormalizedEntries => {
   }
 
   return {
-    tagGroups: entries.tagGroups ?? [],
+    tagGroups: (entries.tagGroups ?? []).map((group) => {
+      const isCompleted =
+        group.id === GENERAL_TAG_GROUP_ID ? false : Boolean(group.isCompleted);
+      return {
+        ...group,
+        isCompleted,
+        completedAt: isCompleted ? (group.completedAt ?? group.updatedAt) : null,
+      };
+    }),
     tags: Array.from(normalizedTagsMap.values()),
     tasks: entries.tasks.map((task) => ({
       ...task,
@@ -137,6 +151,7 @@ const matchesTag = (localTag: Tag | undefined, remoteTag: EntriesTag): boolean =
       localTag.name === remoteTag.name &&
       localTag.color === remoteTag.color &&
       localTag.groupId === remoteTag.groupId &&
+      localTag.isCompleted === Boolean(remoteTag.isCompleted) &&
       localTag.createdAt === remoteTag.createdAt &&
       localTag.updatedAt === remoteTag.updatedAt,
   );
@@ -226,16 +241,24 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
         continue;
       }
       await db.runAsync(
-        `INSERT INTO tag_groups (id, name, createdAt, updatedAt, isDeleted, deletedAt)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO tag_groups (id, name, isCompleted, completedAt, createdAt, updatedAt, isDeleted, deletedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name,
+           isCompleted = excluded.isCompleted,
+           completedAt =
+             CASE
+               WHEN excluded.isCompleted = 0 THEN NULL
+               ELSE COALESCE(tag_groups.completedAt, excluded.completedAt, excluded.updatedAt)
+             END,
            createdAt = excluded.createdAt,
            updatedAt = excluded.updatedAt,
            isDeleted = excluded.isDeleted,
            deletedAt = excluded.deletedAt;`,
         group.id,
         group.name,
+        group.isCompleted ? 1 : 0,
+        group.isCompleted ? (group.completedAt ?? group.updatedAt) : null,
         group.createdAt,
         group.updatedAt,
         group.isDeleted ? 1 : 0,
@@ -243,7 +266,11 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
       );
     }
 
-    for (const tag of entries.tags) {
+    const orderedTags = [...entries.tags].sort(
+      (left, right) => Number(Boolean(right.isDeleted)) - Number(Boolean(left.isDeleted)),
+    );
+
+    for (const tag of orderedTags) {
       const localTag = await db.getFirstAsync<{ updatedAt: string }>(
         'SELECT updatedAt FROM tags WHERE id = ?;',
         tag.id,
@@ -259,12 +286,20 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
       }
       await db.runAsync(
         `
-          INSERT INTO tags (id, name, color, groupId, createdAt, updatedAt, isDeleted, deletedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO tags (
+            id, name, color, groupId, isCompleted, completedAt, createdAt, updatedAt, isDeleted, deletedAt
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             color = excluded.color,
             groupId = excluded.groupId,
+            isCompleted = excluded.isCompleted,
+            completedAt =
+              CASE
+                WHEN excluded.isCompleted = 0 THEN NULL
+                ELSE COALESCE(tags.completedAt, excluded.completedAt, excluded.updatedAt)
+              END,
             createdAt = excluded.createdAt,
             updatedAt = excluded.updatedAt,
             isDeleted = excluded.isDeleted,
@@ -274,6 +309,8 @@ const applyEntries = async (entries: NormalizedEntries): Promise<void> => {
         tag.name,
         tag.color,
         tag.groupId,
+        tag.isCompleted ? 1 : 0,
+        tag.isCompleted ? (tag.completedAt ?? tag.updatedAt) : null,
         tag.createdAt,
         tag.updatedAt,
         tag.isDeleted ? 1 : 0,
@@ -440,8 +477,8 @@ const buildPendingDownsyncEntries = (
       entityType: 'tagGroup',
       entityId: group.id,
       title: groupName,
-      subtitle: 'Gruppe · Neu',
-      detail: 'Leere Tag-Gruppe',
+      subtitle: 'Projekt · Neu',
+      detail: 'Leeres Projekt',
       statusLabel: 'Neu',
     });
   }
@@ -458,7 +495,7 @@ const buildPendingDownsyncEntries = (
       entityId: tag.id,
       title: tag.name,
       subtitle: `Tag · ${buildStatusLabel(Boolean(localTag))}`,
-      detail: `Gruppe ${tag.groupId ?? 'Allgemein'} - Farbe ${tag.color}`,
+      detail: `Projekt ${tag.groupId ?? 'Allgemein'} - Farbe ${tag.color}`,
       statusLabel: buildStatusLabel(Boolean(localTag)),
     });
   }
@@ -610,7 +647,7 @@ const buildImportSubset = async (
     const remoteGroup = entries.tagGroups.find((group) => group.id === entityId);
 
     if (!remoteGroup) {
-      throw new Error('Die ausgewählte Gruppe wurde nicht mehr gefunden.');
+      throw new Error('Das ausgewählte Projekt wurde nicht mehr gefunden.');
     }
 
     ensureTagGroup(remoteGroup.name);

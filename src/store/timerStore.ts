@@ -139,7 +139,8 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
 
     if (record.selectedTaskId) {
       const selectedTask = await getTaskById(record.selectedTaskId);
-      if (!selectedTask) {
+      const taskTag = selectedTask ? await getTagById(selectedTask.tagId) : null;
+      if (!selectedTask || selectedTask.isCompleted || !taskTag || taskTag.isCompleted) {
         record = {
           ...record,
           selectedTaskId: null,
@@ -149,9 +150,10 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     }
 
     const selectedTag = await getTagById(record.selectedTagId);
-    if (!selectedTag) {
+    if (!selectedTag || selectedTag.isCompleted) {
       record = {
         ...record,
+        selectedTaskId: null,
         selectedTagId: GENERAL_TAG_ID,
       };
     }
@@ -375,6 +377,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     const persisted = await saveTimerState(
       stripUpdatedAt({
         ...current,
+        selectedTaskId: null,
         selectedTagId: GENERAL_TAG_ID,
       }),
     );

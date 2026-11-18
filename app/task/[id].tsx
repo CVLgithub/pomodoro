@@ -14,6 +14,7 @@ import { TextField } from '../../src/components/ui/TextField';
 import { colors } from '../../src/constants/colors';
 import { GENERAL_TAG_ID } from '../../src/constants/config';
 import { routes } from '../../src/constants/routes';
+import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
 import { useTimerStore } from '../../src/store/timerStore';
@@ -27,7 +28,7 @@ import {
   sortTaskWeekdays,
   TASK_WEEKDAY_ORDER,
 } from '../../src/utils/taskRecurrence';
-import { sortTagsByGroupAndName } from '../../src/utils/tagGroups';
+import { isTagCompleted, sortTagsByGroupAndName } from '../../src/utils/tagGroups';
 
 const WEEKDAY_OPTIONS = TASK_WEEKDAY_ORDER.map((day) => ({
   value: day,
@@ -45,6 +46,7 @@ export default function TaskDetailScreen() {
   const updateTask = useTasksStore((state) => state.updateTask);
   const deleteTask = useTasksStore((state) => state.deleteTask);
   const tags = useTagsStore((state) => state.tags);
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
   const selectTimerTask = useTimerStore((state) => state.selectTask);
   const task = useMemo(() => tasks.find((entry) => entry.id === taskId) ?? null, [taskId, tasks]);
 
@@ -277,7 +279,9 @@ export default function TaskDetailScreen() {
         </View>
       </View>
 
-      {isNew || isCompleted ? null : (
+      {isNew ||
+      isCompleted ||
+      isTagCompleted(tags.find((entry) => entry.id === tagId), tagGroups) ? null : (
         <Button label="Im Timer verwenden" variant="secondary" onPress={() => void useInTimer()} />
       )}
 

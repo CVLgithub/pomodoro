@@ -23,7 +23,7 @@ import { confirmAction } from '../src/utils/confirm';
 
 const ENTRY_GROUPS: readonly { entityType: DownsyncEntityType; title: string }[] = [
   { entityType: 'session', title: 'Sessions' },
-  { entityType: 'tagGroup', title: 'Gruppen' },
+  { entityType: 'tagGroup', title: 'Projekte' },
   { entityType: 'tag', title: 'Tags' },
   { entityType: 'task', title: 'Aufgaben' },
 ];

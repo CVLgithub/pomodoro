@@ -1,5 +1,7 @@
 import type { Href } from 'expo-router';
 
+import type { StatsPeriod } from '../utils/stats';
+
 /**
  * Zentrale Routen. Die Typen der Expo-Router-Routen entstehen erst beim Start
  * des Dev-Servers; die Zusicherung hält die Typprüfung davon unabhängig.
@@ -28,4 +30,8 @@ export const routes = {
   manualSessionSheet: route('/sheet/manual-session'),
   sessionSheet: (id: string) => route(`/sheet/session/${id}`),
   newGroupSheet: route('/sheet/new-group'),
+  statsTagSheet: (tagId: string, period: StatsPeriod, anchorDateKey: string) =>
+    route(
+      `/sheet/stats-tag/${encodeURIComponent(tagId)}?period=${encodeURIComponent(period)}&anchor=${encodeURIComponent(anchorDateKey)}`,
+    ),
 } as const;

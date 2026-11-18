@@ -20,6 +20,7 @@ import { useTagsStore } from '../../src/store/tagsStore';
 import { themedStyles } from '../../src/theme/runtime';
 import { START_PAGE_OPTIONS } from '../../src/types/settings';
 import { formatDateKey, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
+import { isTagCompleted } from '../../src/utils/tagGroups';
 
 const formatSyncMoment = (isoValue: string): string => {
   const date = new Date(isoValue);
@@ -35,7 +36,9 @@ export default function SettingsScreen() {
   const startPageRow = useRef<ComponentRef<typeof View>>(null);
   const [startPageMenuAnchor, setStartPageMenuAnchor] = useState<MenuAnchor | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const tagCount = useTagsStore((state) => state.tags.length);
+  const tags = useTagsStore((state) => state.tags);
+  const tagGroups = useSettingsStore((state) => state.tagGroups);
+  const tagCount = tags.filter((tag) => !isTagCompleted(tag, tagGroups)).length;
   const deletedSessionCount = useSessionsStore((state) => state.deletedSessions.length);
   const failedQueueCount = useSyncStore(
     (state) => state.items.filter((item) => item.status === 'failed').length,
@@ -124,15 +127,9 @@ export default function SettingsScreen() {
 
       <ListGroup>
         <ListRow
-          label="Tags und Gruppen"
+          label="Tags und Projekte"
           value={String(tagCount)}
           onPress={() => router.push(routes.tags)}
-        />
-        <ListRow
-          label="Gelöschte Sessions"
-          value={String(deletedSessionCount)}
-          onPress={() => router.push(routes.deletedSessions)}
-          separated
         />
       </ListGroup>
 
@@ -149,6 +146,12 @@ export default function SettingsScreen() {
           label="Fehlgeschlagene Übertragungen"
           value={String(failedQueueCount)}
           onPress={() => router.push(routes.syncQueue)}
+          separated
+        />
+        <ListRow
+          label="Gelöschte Sessions"
+          value={String(deletedSessionCount)}
+          onPress={() => router.push(routes.deletedSessions)}
           separated
         />
         <ListRow

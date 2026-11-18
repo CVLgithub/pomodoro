@@ -54,13 +54,13 @@ export const clearLocalDataAndQueue = async (): Promise<void> => {
       now,
     );
     await transaction.runAsync(
-      'UPDATE tag_groups SET name = ?, updatedAt = ?, isDeleted = 0, deletedAt = NULL WHERE id = ?;',
+      'UPDATE tag_groups SET name = ?, isCompleted = 0, completedAt = NULL, updatedAt = ?, isDeleted = 0, deletedAt = NULL WHERE id = ?;',
       GENERAL_TAG_GROUP_NAME,
       now,
       GENERAL_TAG_GROUP_ID,
     );
     await transaction.runAsync(
-      'UPDATE tags SET name = ?, color = ?, groupId = ?, updatedAt = ?, isDeleted = 0, deletedAt = NULL WHERE id = ?;',
+      'UPDATE tags SET name = ?, color = ?, groupId = ?, isCompleted = 0, completedAt = NULL, updatedAt = ?, isDeleted = 0, deletedAt = NULL WHERE id = ?;',
       GENERAL_TAG_NAME,
       '#5EA2FF',
       GENERAL_TAG_GROUP_ID,

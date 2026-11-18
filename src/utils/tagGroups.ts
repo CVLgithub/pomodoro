@@ -46,6 +46,43 @@ export const normalizeCustomTagGroupName = (value?: string | null): string | nul
 export const getTagGroupKey = (groupId?: string | null): string =>
   groupId ?? GENERAL_TAG_GROUP_ID;
 
+export const isSameTagName = (left: string, right: string): boolean =>
+  left.trim().localeCompare(right.trim(), 'de-DE', { sensitivity: 'base' }) === 0;
+
+export const hasDuplicateTagNameInGroup = (
+  tags: readonly Pick<Tag, 'id' | 'name' | 'groupId' | 'isDeleted'>[],
+  name: string,
+  groupId: string | null | undefined,
+  excludeTagId?: string,
+): boolean => {
+  const targetGroupKey = getTagGroupKey(groupId);
+
+  return tags.some(
+    (tag) =>
+      !tag.isDeleted &&
+      tag.id !== excludeTagId &&
+      getTagGroupKey(tag.groupId) === targetGroupKey &&
+      isSameTagName(tag.name, name),
+  );
+};
+
+export const isTagCompleted = (
+  tag: Pick<Tag, 'isCompleted' | 'groupId'> | undefined | null,
+  groups: readonly Pick<TagGroup, 'id' | 'isCompleted' | 'isDeleted'>[] = [],
+): boolean => {
+  if (!tag) {
+    return false;
+  }
+  if (tag.isCompleted) {
+    return true;
+  }
+  if (!tag.groupId || tag.groupId === GENERAL_TAG_GROUP_ID) {
+    return false;
+  }
+  const group = groups.find((entry) => entry.id === tag.groupId && !entry.isDeleted);
+  return Boolean(group?.isCompleted);
+};
+
 export const getTagGroupLabel = (groupId?: string | null, groups: TagGroup[] = []): string =>
   groups.find((group) => group.id === groupId)?.name ?? DEFAULT_TAG_GROUP_LABEL;
 
@@ -102,7 +139,13 @@ export const normalizeTagGroupNames = (groupNames: (string | null | undefined)[]
   return Array.from(groupsByCompareKey.values()).sort(compareTagGroupNames);
 };
 
-export const buildTagGroupOptions = (tags: Tag[], groups: TagGroup[] = []): TagGroupOption[] => {
+export const buildTagGroupOptions = (
+  tags: Tag[],
+  groups: TagGroup[] = [],
+  options?: { includeCompleted?: boolean },
+): TagGroupOption[] => {
+  const includeCompleted = Boolean(options?.includeCompleted);
+
   return [
     {
       key: GENERAL_TAG_GROUP_ID,
@@ -110,12 +153,17 @@ export const buildTagGroupOptions = (tags: Tag[], groups: TagGroup[] = []): TagG
       value: GENERAL_TAG_GROUP_ID,
     },
     ...groups
-      .filter((group) => group.id !== GENERAL_TAG_GROUP_ID && !group.isDeleted)
+      .filter(
+        (group) =>
+          group.id !== GENERAL_TAG_GROUP_ID &&
+          !group.isDeleted &&
+          (includeCompleted || !group.isCompleted),
+      )
       .map((group) => ({
-      key: group.id,
-      label: group.name,
-      value: group.id,
-    })),
+        key: group.id,
+        label: group.name,
+        value: group.id,
+      })),
   ];
 };
 
