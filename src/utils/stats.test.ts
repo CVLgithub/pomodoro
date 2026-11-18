@@ -9,16 +9,22 @@ import {
   getStatsRange,
   shiftStatsAnchor,
   summarizeSessions,
+  summarizeTagTasks,
 } from './stats';
 
-const session = (date: string, durationMinutes: number, tagId = 'a'): Session => ({
-  id: `${date}-${durationMinutes}-${tagId}`,
-  title: 'Session',
+const session = (
+  date: string,
+  durationMinutes: number,
+  tagId = 'a',
+  options?: { title?: string; taskId?: string | null },
+): Session => ({
+  id: `${date}-${durationMinutes}-${tagId}-${options?.taskId ?? options?.title ?? ''}`,
+  title: options?.title ?? 'Session',
   date,
   startTime: `${date}T09:00:00+01:00`,
   endTime: `${date}T10:00:00+01:00`,
   durationMinutes,
-  taskId: null,
+  taskId: options?.taskId ?? null,
   tagId,
   syncStatus: 'synced',
   createdAt: date,
@@ -80,6 +86,44 @@ describe('summarizeSessions', () => {
       averageMinutesPerActiveDay: 0,
       tags: [],
     });
+  });
+});
+
+describe('summarizeTagTasks', () => {
+  it('gruppiert Sessions eines Tags nach Aufgabe bzw. Titel und sortiert nach Zeit', () => {
+    const tagSessions = [
+      session('2026-11-09', 25, 'a', { taskId: 't1', title: 'Alter Titel' }),
+      session('2026-11-10', 50, 'a', { taskId: 't1', title: 'Neuer Titel' }),
+      session('2026-11-10', 40, 'a', { title: 'Freie Session' }),
+      session('2026-11-11', 20, 'a', { title: 'freie session' }),
+      session('2026-11-11', 30, 'a', { taskId: 't2', title: 'Übungsblatt 3' }),
+      session('2026-11-11', 90, 'b', { taskId: 't3', title: 'Anderer Tag' }),
+    ];
+    const taskTitles = new Map([['t1', 'Kapitel 4 lesen']]);
+
+    expect(summarizeTagTasks(tagSessions, 'a', taskTitles)).toEqual([
+      {
+        key: 'task:t1',
+        taskId: 't1',
+        title: 'Kapitel 4 lesen',
+        minutes: 75,
+        sessionCount: 2,
+      },
+      {
+        key: 'title:freie session',
+        taskId: null,
+        title: 'Freie Session',
+        minutes: 60,
+        sessionCount: 2,
+      },
+      {
+        key: 'task:t2',
+        taskId: 't2',
+        title: 'Übungsblatt 3',
+        minutes: 30,
+        sessionCount: 1,
+      },
+    ]);
   });
 });
 

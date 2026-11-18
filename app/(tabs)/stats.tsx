@@ -15,7 +15,7 @@ import { useSessionsStore } from '../../src/store/sessionsStore';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { themedStyles } from '../../src/theme/runtime';
-import { formatShortDateLabel, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
+import { formatDateKey, formatShortDateLabel, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
 import {
   StatsPeriod,
   buildStatsBars,
@@ -53,6 +53,7 @@ export default function StatsScreen() {
   const [showCompletedTags, setShowCompletedTags] = useState(false);
 
   const todayKey = getTodayDateKey();
+  const anchorKey = useMemo(() => formatDateKey(anchor), [anchor]);
   const tagsById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
   const range = useMemo(() => getStatsRange(period, anchor), [anchor, period]);
   const periodSessions = useMemo(
@@ -97,7 +98,13 @@ export default function StatsScreen() {
     const tag = tagsById.get(entry.tagId);
 
     return (
-      <View key={entry.tagId} style={styles.tagRow}>
+      <Pressable
+        key={entry.tagId}
+        accessibilityRole="button"
+        accessibilityHint="Zeit nach Aufgaben anzeigen"
+        onPress={() => openSheet(routes.statsTagSheet(entry.tagId, period, anchorKey))}
+        style={({ pressed }) => [styles.tagRow, pressed ? styles.tagRowPressed : null]}
+      >
         <View style={[styles.dot, { backgroundColor: tag?.color ?? colors.textMuted }]} />
         <Text style={styles.tagName} numberOfLines={1}>
           {tag?.name ?? 'Ohne Tag'}
@@ -111,7 +118,8 @@ export default function StatsScreen() {
           />
         </View>
         <Text style={styles.tagValue}>{formatHoursClock(entry.minutes)}</Text>
-      </View>
+        <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+      </Pressable>
     );
   };
 
@@ -403,6 +411,9 @@ const styles = themedStyles(() => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  tagRowPressed: {
+    opacity: 0.6,
   },
   dot: {
     width: 10,

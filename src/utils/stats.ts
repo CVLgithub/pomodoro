@@ -164,6 +164,14 @@ export interface StatsSummary {
   tags: { tagId: string; minutes: number }[];
 }
 
+export interface TagTaskStats {
+  key: string;
+  taskId: string | null;
+  title: string;
+  minutes: number;
+  sessionCount: number;
+}
+
 export const summarizeSessions = (sessions: Session[]): StatsSummary => {
   const totalMinutes = sessions.reduce((sum, session) => sum + session.durationMinutes, 0);
   const activeDays = new Set(sessions.map((session) => session.date)).size;
@@ -177,6 +185,52 @@ export const summarizeSessions = (sessions: Session[]): StatsSummary => {
     averageMinutesPerActiveDay: activeDays === 0 ? 0 : Math.round(totalMinutes / activeDays),
     tags,
   };
+};
+
+/**
+ * Gruppiert Sessions eines Tags nach Aufgabe (oder bei freien/umbenannten Sessions
+ * nach ihrem Titel) und sortiert sie absteigend nach Fokuszeit.
+ */
+export const summarizeTagTasks = (
+  sessions: Session[],
+  tagId: string,
+  taskTitlesById?: ReadonlyMap<string, string>,
+): TagTaskStats[] => {
+  const entries = new Map<string, TagTaskStats>();
+
+  for (const session of sessions) {
+    if (session.tagId !== tagId) {
+      continue;
+    }
+
+    const title =
+      (session.taskId ? taskTitlesById?.get(session.taskId) : undefined)?.trim() ||
+      session.title.trim() ||
+      'Session';
+    const key = session.taskId
+      ? `task:${session.taskId}`
+      : `title:${title.toLocaleLowerCase('de-DE')}`;
+    const existing = entries.get(key);
+
+    if (existing) {
+      existing.minutes += session.durationMinutes;
+      existing.sessionCount += 1;
+    } else {
+      entries.set(key, {
+        key,
+        taskId: session.taskId,
+        title,
+        minutes: session.durationMinutes,
+        sessionCount: 1,
+      });
+    }
+  }
+
+  return Array.from(entries.values()).sort(
+    (left, right) =>
+      right.minutes - left.minutes ||
+      left.title.localeCompare(right.title, 'de-DE', { sensitivity: 'base' }),
+  );
 };
 
 /** Dauer als Stunden und Minuten, z. B. `6:55`. */
