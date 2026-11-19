@@ -17,7 +17,6 @@ import { routes } from '../../src/constants/routes';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
-import { useTimerStore } from '../../src/store/timerStore';
 import { showToast, useUiStore } from '../../src/store/uiStore';
 import { themedStyles } from '../../src/theme/runtime';
 import { Tag } from '../../src/types/tag';
@@ -36,7 +35,6 @@ import {
   getResolvedTaskOccurrencesInRange,
   isTaskRecurring,
 } from '../../src/utils/taskRecurrence';
-import { confirmAction } from '../../src/utils/confirm';
 import { haptics } from '../../src/utils/haptics';
 import { isTagCompleted } from '../../src/utils/tagGroups';
 
@@ -252,30 +250,6 @@ export default function TasksScreen() {
       .catch(reportError('Aufgabe konnte nicht erstellt werden'));
   };
 
-  const focusTask = async (task: Task) => {
-    const timer = useTimerStore.getState();
-
-    if (timer.status !== 'idle' && timer.selectedTaskId !== task.id) {
-      const confirmed = await confirmAction({
-        title: 'Laufende Session umhängen?',
-        message: `Die laufende Session wird „${task.title}“ zugeordnet.`,
-        confirmLabel: 'Zuordnen',
-        destructive: false,
-      });
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
-    try {
-      await timer.selectTask(task.id);
-      router.navigate(routes.timer);
-    } catch (error) {
-      reportError('Aufgabe konnte nicht zugewiesen werden')(error);
-    }
-  };
-
   const moveOverdueToToday = async (entries: Entry[]) => {
     const todayKey = getTodayDateKey();
     const previous = entries.map((entry) => ({ id: entry.task.id, date: entry.task.date }));
@@ -306,7 +280,7 @@ export default function TasksScreen() {
     });
   };
 
-  const renderRows = (entries: Entry[], options?: { withFocus?: boolean }) =>
+  const renderRows = (entries: Entry[]) =>
     entries.map((entry, index) => (
       <TaskRow
         key={entry.key}
@@ -318,7 +292,6 @@ export default function TasksScreen() {
         displayDate={entry.displayDate}
         disableToggle={entry.disableToggle}
         onPress={() => router.push(routes.task(entry.task.id))}
-        onFocus={options?.withFocus ? () => void focusTask(entry.task) : undefined}
         onToggle={(value) =>
           void toggleTaskCompletion(
             entry.task.id,
@@ -427,7 +400,7 @@ export default function TasksScreen() {
                   </Pressable>
                 ) : null}
               </View>
-              <Glass radius={26}>{renderRows(section.entries, { withFocus: true })}</Glass>
+              <Glass radius={26}>{renderRows(section.entries)}</Glass>
             </View>
           ))}
 
@@ -497,7 +470,7 @@ export default function TasksScreen() {
               </Text>
             </View>
             <Glass radius={26}>
-              {renderRows(dayEntries, { withFocus: true })}
+              {renderRows(dayEntries)}
               <TaskComposer
                 placeholder="Neue Aufgabe für diesen Tag"
                 onSubmit={addTaskForSelectedDate}

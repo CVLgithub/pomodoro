@@ -7,12 +7,12 @@
 - Zustand fuer modulare Stores (`tasks`, `tags`, `sessions`, `timer`, `stopwatch`, `sync`, `settings`, `ui`).
 - Push- und Downsync ueber `fetch`: lokale Aenderungen werden ueber die Sync-Queue an das Backend gesendet, gespeicherte Eintraege koennen ueber `/entries` zurueckgeladen werden.
 - Timer mit persistiertem State, Resume-basierter Restzeitberechnung und lokaler Session-Speicherung.
-- Vier Farbwelten (Nebel als Standard, Graphit, Glut, Wald), waehlbar unter Einstellungen > App > Darstellung und nur lokal gespeichert.
+- Fuenf Farbwelten (Nebel als Standard, Graphit, Schwarz, Glut, Wald), waehlbar unter Einstellungen > App > Darstellung und nur lokal gespeichert.
 - Glasflaechen ueber `expo-glass-effect`: natives Liquid Glass ab iOS 26, sonst eine halbtransparente Ersatzdarstellung (im Web mit `backdrop-filter`).
 
 ### Design-System
 
-- `src/theme/palettes.ts`: die vier Farbwelten mit allen Farb-Tokens.
+- `src/theme/palettes.ts`: die fuenf Farbwelten mit allen Farb-Tokens.
 - `src/theme/runtime.ts`: aktive Farbwelt und `themedStyles(() => ({...}))` als Ersatz fuer `StyleSheet.create` auf Modulebene.
 - `src/constants/colors.ts`: `colors.*` liest immer die aktive Farbwelt. Nur zur Renderzeit oder in `themedStyles` lesen.
 - Nach einem Wechsel der Farbwelt baut `app/_layout.tsx` den Baum ueber `key={theme}` neu auf.
@@ -173,7 +173,7 @@ src/
 
 - `today.tsx` (Stoppuhr): Zeit gross in der Mitte, Zuordnung und Bedienung in einer Glasflaeche, heutige Fokuszeit im Kopf.
 - `timer.tsx`: gleicher Aufbau; Modus und Dauer in einem gemeinsamen Blatt, `+5` verlaengert eine laufende oder pausierte Session. Vorzeitiges Beenden einer Fokus-Session fragt nach Speichern oder Verwerfen; in Pausen wird daraus „Pause ueberspringen“.
-- `tasks.tsx`: Liste nach Faelligkeit (Ueberfaellig, Heute, Demnaechst, Wiederkehrend, Ohne Datum, Erledigt) mit Tag-Filter und Schnelleingabe; die Play-Taste einer Zeile waehlt die Aufgabe im Timer. Der Kalender ist eine zweite Ansicht im selben Tab.
+- `tasks.tsx`: Liste nach Faelligkeit (Ueberfaellig, Heute, Demnaechst, Wiederkehrend, Ohne Datum, Erledigt) mit Tag-Filter und Schnelleingabe. Der Kalender ist eine zweite Ansicht im selben Tab.
 - `stats.tsx`: Zeitraum (Tag, Woche, Monat, Gesamt), Summe mit Vergleich zum Vorzeitraum und Serie, antippbares Balkendiagramm, Verteilung nach Tags, Sessions zum Bearbeiten; `+` traegt eine vergangene Session nach.
 - `settings.tsx`: Darstellung, Startseite, Pausenwechsel, Synchronisieren und Verweise auf die Unterseiten.
 - `prefs/notifications.tsx`, `prefs/tags.tsx`, `prefs/deleted-sessions.tsx`, `prefs/sync-queue.tsx`, `prefs/connection.tsx`: Unterseiten der Einstellungen.

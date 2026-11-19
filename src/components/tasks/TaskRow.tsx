@@ -23,8 +23,6 @@ interface TaskRowProps {
   isCompleted?: boolean;
   completedAt?: string | null;
   disableToggle?: boolean;
-  /** Zeigt rechts eine Taste, die die Aufgabe im Timer wählt. */
-  onFocus?: () => void;
 }
 
 export const TaskRow = ({
@@ -37,7 +35,6 @@ export const TaskRow = ({
   isCompleted,
   completedAt,
   disableToggle = false,
-  onFocus,
 }: TaskRowProps) => {
   // Die Gruppe steht als Vorsatz vor dem Tag ("Uni › Mathe") und braucht so
   // keine eigene Zeile. "Allgemein" bleibt weg, weil es nichts einordnet.
@@ -92,7 +89,7 @@ export const TaskRow = ({
         accessibilityRole="button"
         accessibilityHint="Aufgabe bearbeiten"
         onPress={onPress}
-        style={[styles.content, onFocus && !resolvedIsCompleted ? styles.contentWithAction : null]}
+        style={styles.content}
       >
         <Text
           style={[styles.title, resolvedIsCompleted ? styles.titleCompleted : null]}
@@ -109,19 +106,6 @@ export const TaskRow = ({
           </View>
         ) : null}
       </Pressable>
-      {onFocus && !resolvedIsCompleted ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${task.title} im Timer fokussieren`}
-          onPress={() => {
-            haptics.light();
-            onFocus();
-          }}
-          style={({ pressed }) => [styles.focusArea, pressed ? styles.focusPressed : null]}
-        >
-          <Ionicon name="play-circle-outline" size={28} color={colors.textSecondary} />
-        </Pressable>
-      ) : null}
     </View>
   );
 };
@@ -163,18 +147,6 @@ const styles = themedStyles(() => ({
     gap: 1,
     paddingVertical: 8,
     paddingRight: 16,
-  },
-  contentWithAction: {
-    paddingRight: 0,
-  },
-  focusArea: {
-    width: 54,
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  focusPressed: {
-    opacity: 0.5,
   },
   title: {
     color: colors.textPrimary,

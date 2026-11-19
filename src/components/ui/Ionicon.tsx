@@ -7,8 +7,7 @@ type SupportedIoniconName =
   | 'list-outline'
   | 'bar-chart-outline'
   | 'repeat'
-  | 'checkmark'
-  | 'play-circle-outline';
+  | 'checkmark';
 
 interface IoniconProps {
   name: SupportedIoniconName;

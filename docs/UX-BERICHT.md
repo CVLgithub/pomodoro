@@ -161,11 +161,11 @@ native Abhängigkeiten auskommen:
 | Stoppuhr | Sessions unter 30 Sekunden werden verworfen, mit Hinweis; sonst Toast mit „Bearbeiten“ | S1, S2 |
 | Stoppuhr | „Heute“-Kapsel zeigt Fortschritt zum Tagesziel | ST3 |
 | Aufgaben | Schnelleingabe in der Listenansicht (übernimmt den Tag-Filter), Toast mit „Bearbeiten“ | A1, A6 |
-| Aufgaben | Play-Taste je offener Aufgabe: wählt sie im Timer und wechselt dorthin | A2 |
 | Aufgaben | „Alle auf heute“ bei überfälligen Aufgaben (mit „Rückgängig“); Anzahl in jeder Abschnittsüberschrift | A3, A4 |
 | Statistik | Balken antippbar (Woche/Monat → Tag, Gesamt → Monat) | ST1 |
 | Statistik | Vergleich mit dem vorigen Zeitraum (ein laufender Zeitraum nur mit dem gleich langen Stück davor), Serie aktiver Tage, Tagesziel in der Tagesansicht | ST2, ST3, ST4 |
 | Statistik | Nachtragen: Schnellwahl für Datum und Dauer, Live-Dauer, Zifferntastatur | ST5 |
+| Darstellung | Neue Farbwelt „Schwarz“: echtes Schwarz ohne farbige Lichtflecken, gut für OLED | – |
 
 Neue reine Logik liegt in `src/utils/` und ist mit Tests abgedeckt (`timerCycle`,
 `timerDurations`, `stats`).
@@ -176,5 +176,7 @@ Neue reine Logik liegt in `src/utils/` und ist mit Tests abgedeckt (`timerCycle`
   und Sheets hinweg und sollte auf dem Gerät getestet werden.
 - **G3, G4, 14–20**: strukturelle Änderungen oder neue native Module (Keep-Awake, Live
   Activities, Widgets). Sie brauchen eine eigene Entscheidung und einen Gerätetest.
+- **A2 (Play-Taste je Aufgabe)**: ausprobiert und wieder entfernt; die Zeilen wirkten damit
+  überladen. Die Aufgabe wird weiter im Timer gewählt.
 - **A8, ST7**: benötigen Schemaänderungen (Migration v13) und Anpassungen an der Sync-Payload
   im Backend.
