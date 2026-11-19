@@ -162,7 +162,7 @@ export const deleteSession = async (id: string): Promise<Session> => {
   );
 
   if (!row) {
-    throw new Error('Session not found');
+    throw new Error('Die Session wurde nicht gefunden.');
   }
 
   return mapSessionRow(row);
@@ -176,7 +176,7 @@ export const updateSessionAssignment = async (
   const existingSession = await getSessionById(id);
 
   if (!existingSession) {
-    throw new Error('Session not found');
+    throw new Error('Die Session wurde nicht gefunden.');
   }
 
   const updatedSession: Session = {
@@ -213,7 +213,7 @@ export const updateSession = async (
   const existingSession = await getSessionById(id);
 
   if (!existingSession) {
-    throw new Error('Session not found');
+    throw new Error('Die Session wurde nicht gefunden.');
   }
 
   const updatedSession: Session = {
@@ -251,7 +251,7 @@ export const restoreSession = async (id: string): Promise<Session> => {
   );
   const restored = await getSessionById(id);
   if (!restored) {
-    throw new Error('Session not found');
+    throw new Error('Die Session wurde nicht gefunden.');
   }
   return restored;
 };

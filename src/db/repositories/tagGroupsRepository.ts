@@ -62,7 +62,7 @@ export const setTagGroupCompleted = async (
   isCompleted: boolean,
 ): Promise<{ group: TagGroup; updatedTagIds: string[] }> => {
   if (id === GENERAL_TAG_GROUP_ID) {
-    throw new Error(`${GENERAL_TAG_GROUP_NAME} cannot be completed`);
+    throw new Error(`„${GENERAL_TAG_GROUP_NAME}“ kann nicht abgeschlossen werden.`);
   }
 
   const db = await getDatabase();
@@ -115,7 +115,7 @@ export const setTagGroupCompleted = async (
 
 export const deleteTagGroup = async (id: string): Promise<string[]> => {
   if (id === GENERAL_TAG_GROUP_ID) {
-    throw new Error(`${GENERAL_TAG_GROUP_NAME} cannot be deleted`);
+    throw new Error(`„${GENERAL_TAG_GROUP_NAME}“ kann nicht gelöscht werden.`);
   }
   const db = await getDatabase();
   const now = toLocalIsoString();

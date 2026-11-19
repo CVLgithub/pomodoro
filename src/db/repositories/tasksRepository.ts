@@ -128,7 +128,7 @@ export const updateTask = async (
   const existingTask = await getTaskById(id);
 
   if (!existingTask) {
-    throw new Error('Task not found');
+    throw new Error('Die Aufgabe wurde nicht gefunden.');
   }
 
   const nextRecurrence = normalizeTaskRecurrence(

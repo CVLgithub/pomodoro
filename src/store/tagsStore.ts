@@ -73,7 +73,7 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
   },
   createTag: async (input) => {
     if (!input.name.trim()) {
-      throw new Error('Name is required');
+      throw new Error('Bitte gib einen Namen ein.');
     }
 
     const tag = await createTagRecord(input);
@@ -84,7 +84,7 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
   },
   updateTag: async (id, input) => {
     if (input.name !== undefined && !input.name.trim()) {
-      throw new Error('Name is required');
+      throw new Error('Bitte gib einen Namen ein.');
     }
 
     const tag = await updateTagRecord(id, input);
@@ -109,7 +109,7 @@ export const useTagsStore = create<TagsStoreState>((set, get) => ({
   },
   deleteTag: async (id) => {
     if (id === GENERAL_TAG_ID) {
-      throw new Error('Allgemein cannot be deleted');
+      throw new Error('„Allgemein“ kann nicht gelöscht werden.');
     }
 
     const result = await deleteTagRecord(id);

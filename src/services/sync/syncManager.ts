@@ -207,7 +207,7 @@ export const syncManager = {
     const item = await getSyncQueueItemById(queueItemId);
 
     if (!item) {
-      throw new Error('Sync queue item not found');
+      throw new Error('Der Eintrag ist nicht mehr in der Warteschlange.');
     }
 
     if (await isQueueItemSuperseded(item)) {

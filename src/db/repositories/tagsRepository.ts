@@ -109,7 +109,7 @@ export const updateTag = async (id: string, input: UpdateTagInput): Promise<Tag>
   const existingTag = await getTagById(id);
 
   if (!existingTag) {
-    throw new Error('Tag not found');
+    throw new Error('Der Tag wurde nicht gefunden.');
   }
 
   const now = toLocalIsoString();
@@ -166,7 +166,7 @@ export interface DeleteTagResult {
 
 export const deleteTag = async (id: string): Promise<DeleteTagResult> => {
   if (id === GENERAL_TAG_ID) {
-    throw new Error(`${GENERAL_TAG_NAME} cannot be deleted`);
+    throw new Error(`„${GENERAL_TAG_NAME}“ kann nicht gelöscht werden.`);
   }
 
   const db = await getDatabase();
