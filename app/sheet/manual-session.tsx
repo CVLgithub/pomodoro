@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 
 import { Button } from '../../src/components/ui/Button';
+import { ChoiceChips } from '../../src/components/ui/ChoiceChips';
 import { Sheet } from '../../src/components/ui/Sheet';
 import { TagChips } from '../../src/components/ui/TagChips';
 import { TextField } from '../../src/components/ui/TextField';
@@ -11,9 +12,34 @@ import { useSheetClose } from '../../src/hooks/useSheet';
 import { useSessionsStore } from '../../src/store/sessionsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { themedStyles } from '../../src/theme/runtime';
-import { addMinutes, formatDateKey, formatTimeLabel, toLocalIsoString } from '../../src/utils/date';
+import {
+  addDays,
+  addMinutes,
+  formatDateKey,
+  formatTimeLabel,
+  getTodayDateKey,
+  toLocalIsoString,
+} from '../../src/utils/date';
+import { formatMinutesLong } from '../../src/utils/duration';
 import { haptics } from '../../src/utils/haptics';
-import { validateManualSession } from '../../src/utils/sessionInput';
+import { createLocalDate, validateManualSession } from '../../src/utils/sessionInput';
+
+type DayChoice = 'today' | 'yesterday';
+
+const DAY_OPTIONS = [
+  { value: 'today', label: 'Heute' },
+  { value: 'yesterday', label: 'Gestern' },
+] as const;
+
+const DURATION_OPTIONS = [
+  { value: 25, label: '25 Min.' },
+  { value: 50, label: '50 Min.' },
+  { value: 60, label: '1 Std.' },
+  { value: 90, label: '1,5 Std.' },
+] as const;
+
+const dateKeyFor = (choice: DayChoice): string =>
+  choice === 'today' ? getTodayDateKey() : formatDateKey(addDays(getTodayDateKey(), -1));
 
 const buildDefaults = () => {
   const now = new Date();
@@ -39,6 +65,25 @@ export default function ManualSessionSheet() {
   const update = (patch: Partial<typeof draft>) => {
     setDraft((current) => ({ ...current, ...patch }));
     setError(null);
+  };
+
+  // Laufend berechnete Dauer; zeigt schon vor dem Sichern, was eingetragen wird.
+  const start = createLocalDate(draft.date, draft.startTime);
+  const end = createLocalDate(draft.date, draft.endTime);
+  const durationMinutes =
+    start && end && end > start ? Math.round((end.getTime() - start.getTime()) / 60000) : null;
+  const selectedDay = (['today', 'yesterday'] as const).find(
+    (choice) => dateKeyFor(choice) === draft.date,
+  );
+
+  // Eine Dauer setzt den Beginn so, dass die Session zur eingetragenen Endzeit
+  // endet. Ist die Endzeit unbrauchbar, endet sie jetzt.
+  const applyDuration = (minutes: number) => {
+    const endDate = end ?? new Date();
+    update({
+      startTime: formatTimeLabel(addMinutes(endDate, -minutes)),
+      endTime: formatTimeLabel(endDate),
+    });
   };
 
   const save = async () => {
@@ -78,6 +123,11 @@ export default function ManualSessionSheet() {
         onChangeText={(title) => update({ title })}
         placeholder="Was hast du gemacht?"
       />
+      <ChoiceChips
+        options={DAY_OPTIONS}
+        selected={selectedDay ? [selectedDay] : []}
+        onToggle={(choice) => update({ date: dateKeyFor(choice) })}
+      />
       <View style={styles.row}>
         <View style={styles.dateField}>
           <TextField
@@ -87,6 +137,7 @@ export default function ManualSessionSheet() {
             placeholder="2026-04-04"
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="numbers-and-punctuation"
           />
         </View>
         <View style={styles.timeField}>
@@ -97,6 +148,7 @@ export default function ManualSessionSheet() {
             placeholder="09:00"
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="numbers-and-punctuation"
           />
         </View>
         <View style={styles.timeField}>
@@ -107,8 +159,19 @@ export default function ManualSessionSheet() {
             placeholder="09:25"
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="numbers-and-punctuation"
           />
         </View>
+      </View>
+      <View style={styles.tags}>
+        <Text style={styles.label}>
+          Dauer{durationMinutes ? ` · ${formatMinutesLong(durationMinutes)}` : ''}
+        </Text>
+        <ChoiceChips
+          options={DURATION_OPTIONS}
+          selected={durationMinutes ? [durationMinutes] : []}
+          onToggle={applyDuration}
+        />
       </View>
       <View style={styles.tags}>
         <Text style={styles.label}>Tag</Text>
