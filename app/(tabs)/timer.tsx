@@ -20,22 +20,30 @@ import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
 import { useTimerStore } from '../../src/store/timerStore';
 import { themedStyles } from '../../src/theme/runtime';
+import { showToast } from '../../src/store/uiStore';
+import { chooseAction } from '../../src/utils/confirm';
 import { addSeconds, formatTimeLabel } from '../../src/utils/date';
+import { formatMinutesLong } from '../../src/utils/duration';
+import { getCycleRound } from '../../src/utils/timerCycle';
 
 const EXTEND_MINUTES = 5;
+/** Ab dieser Laufzeit fragt "Beenden" nach, ob die Session gespeichert werden soll. */
+const ASK_BEFORE_FINISH_SECONDS = 30;
 
 export default function TimerScreen() {
   const timer = useTimer();
   const openSheet = useOpenSheet();
   const tasks = useTasksStore((state) => state.tasks);
   const tags = useTagsStore((state) => state.tags);
-  const { start, pause, resume, finishNow, extend } = useTimerStore(
+  const { start, pause, resume, finishNow, extend, reset, setMode } = useTimerStore(
     useShallow((state) => ({
       start: state.start,
       pause: state.pause,
       resume: state.resume,
       finishNow: state.finishNow,
       extend: state.extend,
+      reset: state.reset,
+      setMode: state.setMode,
     })),
   );
 
@@ -48,9 +56,38 @@ export default function TimerScreen() {
   };
 
   const isIdle = timer.status === 'idle';
+  const isBreak = timer.activeMode !== 'focus';
   const activeMode =
     TIMER_MODES.find((entry) => entry.mode === timer.activeMode) ?? TIMER_MODES[0];
-  const round = Math.min(timer.completedFocusCountInCycle + 1, FOCUS_CYCLE_LENGTH);
+  const round = getCycleRound(timer.activeMode, timer.completedFocusCountInCycle);
+
+  // Eine Fokus-Session vorzeitig zu beenden ist selten gewollt und ein
+  // versehentlicher Tipp würde sonst sofort eine halbe Session speichern.
+  const finishEarly = async () => {
+    const elapsedSeconds = Math.max(0, timer.totalSeconds - timer.remainingSeconds);
+
+    if (isBreak || elapsedSeconds < ASK_BEFORE_FINISH_SECONDS) {
+      await finishNow();
+      return;
+    }
+
+    const choice = await chooseAction({
+      title: 'Session vorzeitig beenden?',
+      message: `Bisher ${formatMinutesLong(elapsedSeconds / 60)} Fokus.`,
+      options: [
+        { value: 'save', label: 'Speichern und beenden' },
+        { value: 'discard', label: 'Verwerfen', style: 'destructive' },
+      ],
+      cancelLabel: 'Weitermachen',
+    });
+
+    if (choice === 'save') {
+      await finishNow();
+    } else if (choice === 'discard') {
+      await reset();
+      showToast({ message: 'Session verworfen' });
+    }
+  };
   const totalMinutes = Math.round(timer.totalSeconds / 60);
   const detail =
     timer.status === 'running'
@@ -116,11 +153,20 @@ export default function TimerScreen() {
         target="timer"
       />
       <ControlRow>
+        {isIdle && isBreak ? (
+          <RoundControl
+            label="Pause überspringen"
+            icon="play-skip-forward"
+            onPress={() =>
+              void runSafely(() => setMode('focus'), 'Pause konnte nicht übersprungen werden')
+            }
+          />
+        ) : null}
         {isIdle ? null : (
           <RoundControl
-            label="Session beenden"
-            icon="stop"
-            onPress={() => void runSafely(finishNow, 'Timer konnte nicht beendet werden')}
+            label={isBreak ? 'Pause überspringen' : 'Session beenden'}
+            icon={isBreak ? 'play-skip-forward' : 'stop'}
+            onPress={() => void runSafely(finishEarly, 'Timer konnte nicht beendet werden')}
           />
         )}
         {isIdle ? (

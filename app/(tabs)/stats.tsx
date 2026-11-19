@@ -15,12 +15,22 @@ import { useSessionsStore } from '../../src/store/sessionsStore';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { themedStyles } from '../../src/theme/runtime';
-import { formatDateKey, formatShortDateLabel, formatTimeLabel, getTodayDateKey } from '../../src/utils/date';
+import {
+  formatDateKey,
+  formatShortDateLabel,
+  formatTimeLabel,
+  getTodayDateKey,
+  parseDateKey,
+} from '../../src/utils/date';
 import {
   StatsPeriod,
+  StatsBar,
   buildStatsBars,
+  comparePreviousPeriod,
+  computeFocusStreak,
   filterSessionsByRange,
   formatHoursClock,
+  formatPeriodComparison,
   formatStatsRangeLabel,
   getStatsRange,
   shiftStatsAnchor,
@@ -47,6 +57,7 @@ export default function StatsScreen() {
   const sessions = useSessionsStore((state) => state.sessions);
   const tags = useTagsStore((state) => state.tags);
   const tagGroups = useSettingsStore((state) => state.tagGroups);
+  const goalHours = useSettingsStore((state) => state.notificationPreferences.dailyFocusGoalHours);
   const [period, setPeriod] = useState<StatsPeriod>('week');
   const [anchor, setAnchor] = useState(() => new Date());
   const [showAllSessions, setShowAllSessions] = useState(false);
@@ -86,11 +97,32 @@ export default function StatsScreen() {
   const maxBarMinutes = Math.max(1, ...bars.map((bar) => bar.minutes));
   const maxTagMinutes = Math.max(1, ...summary.tags.map((entry) => entry.minutes));
   const canGoForward = range !== null && range.endKey < todayKey;
+  const streak = useMemo(() => computeFocusStreak(sessions, todayKey), [sessions, todayKey]);
+  const comparison = useMemo(() => {
+    const result = comparePreviousPeriod(period, anchor, sessions, summary.totalMinutes, todayKey);
+    return result ? { text: formatPeriodComparison(result), up: (result.changePercent ?? 0) > 0 } : null;
+  }, [anchor, period, sessions, summary.totalMinutes, todayKey]);
+  const goalMinutes = goalHours ? goalHours * 60 : null;
   const shownSessions = showAllSessions ? periodSessions : periodSessions.slice(0, SESSION_LIMIT);
 
   const changePeriod = (next: StatsPeriod) => {
     setPeriod(next);
     setAnchor(new Date());
+    setShowAllSessions(false);
+  };
+
+  // Ein Balken führt eine Ebene tiefer: vom Wochen- oder Monatsbalken in den
+  // Tag, vom Monatsbalken der Gesamtansicht in den Monat.
+  const openBar = (bar: StatsBar) => {
+    if (period === 'all') {
+      const [year, month] = bar.key.split('-').map(Number);
+      setPeriod('month');
+      setAnchor(new Date(year, month - 1, 1, 12));
+    } else {
+      setPeriod('day');
+      setAnchor(parseDateKey(bar.key));
+    }
+
     setShowAllSessions(false);
   };
 
@@ -172,29 +204,52 @@ export default function StatsScreen() {
           {formatHoursClock(summary.totalMinutes)}
         </Text>
         <Text style={styles.totalDetail}>
-          {period === 'day' || summary.activeDays === 0
-            ? 'Stunden'
-            : `Stunden · Ø ${formatHoursClock(summary.averageMinutesPerActiveDay)} je aktivem Tag · ${
-                summary.activeDays === 1 ? '1 aktiver Tag' : `${summary.activeDays} aktive Tage`
-              }`}
+          {period === 'day'
+            ? goalMinutes
+              ? `Stunden · Ziel ${formatHoursClock(goalMinutes)} · ${Math.round(
+                  (summary.totalMinutes / goalMinutes) * 100,
+                )} %`
+              : 'Stunden'
+            : summary.activeDays === 0
+              ? 'Stunden'
+              : `Stunden · Ø ${formatHoursClock(summary.averageMinutesPerActiveDay)} je aktivem Tag · ${
+                  summary.activeDays === 1 ? '1 aktiver Tag' : `${summary.activeDays} aktive Tage`
+                }`}
         </Text>
+        {comparison?.text || streak >= 2 ? (
+          <View style={styles.badges}>
+            {comparison?.text ? (
+              <View style={styles.badge}>
+                <Ionicons
+                  name={comparison.up ? 'trending-up' : 'trending-down'}
+                  size={14}
+                  color={comparison.up ? colors.success : colors.textSecondary}
+                />
+                <Text style={styles.badgeLabel}>{comparison.text}</Text>
+              </View>
+            ) : null}
+            {streak >= 2 ? (
+              <View style={styles.badge} accessibilityLabel={`Serie: ${streak} Tage in Folge fokussiert`}>
+                <Ionicons name="flame" size={14} color={colors.warning} />
+                <Text style={styles.badgeLabel}>{streak} Tage in Folge</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       {bars.length > 0 ? (
-        <Glass
-          radius={30}
-          style={styles.chart}
-          accessible
-          accessibilityRole="image"
-          accessibilityLabel={`Fokuszeit je ${period === 'all' ? 'Monat' : 'Tag'}: ${
-            bars
-              .filter((bar) => bar.minutes > 0)
-              .map((bar) => `${period === 'all' ? bar.key : formatShortDateLabel(bar.key)} ${formatHoursClock(bar.minutes)}`)
-              .join(', ') || 'keine Einträge'
-          }`}
-        >
+        <Glass radius={30} style={styles.chart}>
           {bars.map((bar) => (
-            <View key={bar.key} style={styles.barColumn}>
+            <Pressable
+              key={bar.key}
+              accessibilityRole="button"
+              accessibilityLabel={`${period === 'all' ? bar.key : formatShortDateLabel(bar.key)}: ${formatHoursClock(bar.minutes)} Stunden`}
+              accessibilityHint={period === 'all' ? 'Monat anzeigen' : 'Tag anzeigen'}
+              disabled={period !== 'all' && bar.key > todayKey}
+              onPress={() => openBar(bar)}
+              style={({ pressed }) => [styles.barColumn, pressed ? styles.barPressed : null]}
+            >
               {period === 'month' ? null : (
                 <Text style={styles.barValue} numberOfLines={1}>
                   {bar.minutes === 0
@@ -224,7 +279,7 @@ export default function StatsScreen() {
               >
                 {bar.label}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </Glass>
       ) : null}
@@ -361,6 +416,31 @@ const styles = themedStyles(() => ({
     flex: 1,
     alignItems: 'center',
     gap: 6,
+  },
+  barPressed: {
+    opacity: 0.6,
+  },
+  badges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    paddingTop: 10,
+  },
+  badge: {
+    minHeight: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    borderRadius: 15,
+    backgroundColor: colors.surfaceElevated,
+  },
+  badgeLabel: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
   // Wert und Beschriftung sind breiter als ein schmaler Balken. Die feste Breite
   // lässt sie mittig über die Spalte hinausragen, statt umzubrechen.

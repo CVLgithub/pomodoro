@@ -1,4 +1,4 @@
-export const THEME_NAMES = ['nebel', 'graphit', 'glut', 'wald'] as const;
+export const THEME_NAMES = ['nebel', 'graphit', 'schwarz', 'glut', 'wald'] as const;
 
 export type ThemeName = (typeof THEME_NAMES)[number];
 
@@ -84,6 +84,22 @@ export const palettes: Record<ThemeName, Palette> = {
     sub: '#CDD1D8',
     primaryFg: '#08090B',
     sheet: '#16171B',
+  },
+  // Echtes Schwarz für OLED-Displays. Die Lichtflecken sind nur ein Hauch
+  // Grau, damit das Glas noch eine Kante hat, ohne die Fläche aufzuhellen.
+  schwarz: {
+    ...darkBase,
+    name: 'schwarz',
+    label: 'Schwarz',
+    bg: '#000000',
+    glows: ['44,44,50', '30,30,34', '56,56,62'],
+    sub: '#D4D4D8',
+    glass: 'rgba(255,255,255,0.08)',
+    glassInner: 'rgba(255,255,255,0.07)',
+    line: 'rgba(255,255,255,0.14)',
+    hairline: 'rgba(255,255,255,0.10)',
+    primaryFg: '#000000',
+    sheet: '#0F0F11',
   },
   glut: {
     ...darkBase,

@@ -77,7 +77,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
   },
   createSessionEntry: async (input) => {
     if (!input.title.trim()) {
-      throw new Error('Name is required');
+      throw new Error('Bitte gib einen Namen ein.');
     }
 
     const durationMinutes = differenceInMinutes(input.endTime, input.startTime);
@@ -100,7 +100,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
     const existingSession = await getSessionById(sessionId);
 
     if (!existingSession) {
-      throw new Error('Session not found');
+      throw new Error('Die Session wurde nicht gefunden.');
     }
 
     let title = FREE_SESSION_TITLE;
@@ -110,7 +110,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
       const task = await getTaskById(options.taskId);
 
       if (!task) {
-        throw new Error('Task not found');
+        throw new Error('Die Aufgabe wurde nicht gefunden.');
       }
 
       title = task.title;
@@ -129,7 +129,7 @@ export const useSessionsStore = create<SessionsStoreState>((set, get) => ({
   },
   updateSessionEntry: async (sessionId, input) => {
     if (!input.title.trim()) {
-      throw new Error('Name is required');
+      throw new Error('Bitte gib einen Namen ein.');
     }
 
     const updatedSession = await updateSession(sessionId, input);

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { CalendarMonthCard } from '../../src/components/calendar/CalendarMonthCard';
+import { TaskComposer } from '../../src/components/tasks/TaskComposer';
 import { TaskRow } from '../../src/components/tasks/TaskRow';
 import { CircleButton } from '../../src/components/ui/CircleButton';
 import { EmptyState } from '../../src/components/ui/EmptyState';
@@ -12,10 +13,11 @@ import { Screen } from '../../src/components/ui/Screen';
 import { Segmented } from '../../src/components/ui/Segmented';
 import { colors } from '../../src/constants/colors';
 import { GENERAL_TAG_ID } from '../../src/constants/config';
+import { routes } from '../../src/constants/routes';
 import { useSettingsStore } from '../../src/store/settingsStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
-import { useUiStore } from '../../src/store/uiStore';
+import { showToast, useUiStore } from '../../src/store/uiStore';
 import { themedStyles } from '../../src/theme/runtime';
 import { Tag } from '../../src/types/tag';
 import { ResolvedTaskOccurrence, Task } from '../../src/types/task';
@@ -56,6 +58,7 @@ type Entry = {
 };
 
 type Section = {
+  key: 'overdue' | 'today' | 'upcoming' | 'recurring' | 'undated';
   title: string;
   entries: Entry[];
 };
@@ -93,10 +96,10 @@ export default function TasksScreen() {
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showCompletedTagTasks, setShowCompletedTagTasks] = useState(false);
-  const [draft, setDraft] = useState('');
   const tasks = useTasksStore((state) => state.tasks);
   const occurrenceCompletions = useTasksStore((state) => state.occurrenceCompletions);
   const createTask = useTasksStore((state) => state.createTask);
+  const updateTask = useTasksStore((state) => state.updateTask);
   const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion);
   const tags = useTagsStore((state) => state.tags);
   const tagGroups = useSettingsStore((state) => state.tagGroups);
@@ -149,14 +152,16 @@ export default function TasksScreen() {
 
     const result: Section[] = [
       {
+        key: 'overdue',
         title: 'Überfällig',
         entries: open
           .filter((task) => task.date !== null && task.date < todayKey)
           .map(dated)
           .sort(byDateThenTitle),
       },
-      { title: 'Heute', entries: today },
+      { key: 'today', title: 'Heute', entries: today },
       {
+        key: 'upcoming',
         title: 'Demnächst',
         entries: open
           .filter((task) => task.date !== null && task.date > todayKey)
@@ -164,6 +169,7 @@ export default function TasksScreen() {
           .sort(byDateThenTitle),
       },
       {
+        key: 'recurring',
         title: 'Wiederkehrend',
         entries: visible
           .filter((task) => isTaskRecurring(task) && !todayIds.has(task.id))
@@ -171,6 +177,7 @@ export default function TasksScreen() {
           .sort(byTitle),
       },
       {
+        key: 'undated',
         title: 'Ohne Datum',
         entries: open
           .filter((task) => task.date === null)
@@ -222,16 +229,55 @@ export default function TasksScreen() {
     Alert.alert(title, error instanceof Error ? error.message : 'Unbekannter Fehler');
   };
 
-  const submitDraft = () => {
-    const title = draft.trim();
-    if (!title) {
-      return;
-    }
-
-    setDraft('');
+  const addTaskForSelectedDate = (title: string) => {
     void createTask({ title, date: selectedDate, tagId: GENERAL_TAG_ID }).catch(
       reportError('Aufgabe konnte nicht erstellt werden'),
     );
+  };
+
+  // In der Liste landet eine schnell erfasste Aufgabe ohne Datum im gefilterten
+  // Tag. Sie steht dann unten unter "Ohne Datum"; die Meldung führt direkt hin.
+  const addTaskFromList = (title: string) => {
+    void createTask({ title, date: null, tagId: activeFilter ?? GENERAL_TAG_ID })
+      .then((task) =>
+        showToast({
+          message: `„${task.title}“ angelegt`,
+          tone: 'success',
+          actionLabel: 'Bearbeiten',
+          onAction: () => router.push(routes.task(task.id)),
+        }),
+      )
+      .catch(reportError('Aufgabe konnte nicht erstellt werden'));
+  };
+
+  const moveOverdueToToday = async (entries: Entry[]) => {
+    const todayKey = getTodayDateKey();
+    const previous = entries.map((entry) => ({ id: entry.task.id, date: entry.task.date }));
+
+    try {
+      for (const entry of entries) {
+        await updateTask(entry.task.id, { date: todayKey });
+      }
+    } catch (error) {
+      reportError('Aufgaben konnten nicht verschoben werden')(error);
+      return;
+    }
+
+    haptics.success();
+    showToast({
+      message:
+        entries.length === 1
+          ? '1 Aufgabe auf heute verschoben'
+          : `${entries.length} Aufgaben auf heute verschoben`,
+      actionLabel: 'Rückgängig',
+      onAction: () => {
+        void (async () => {
+          for (const entry of previous) {
+            await updateTask(entry.id, { date: entry.date });
+          }
+        })().catch(reportError('Verschieben konnte nicht rückgängig gemacht werden'));
+      },
+    });
   };
 
   const renderRows = (entries: Entry[]) =>
@@ -245,7 +291,7 @@ export default function TasksScreen() {
         completedAt={entry.completedAt}
         displayDate={entry.displayDate}
         disableToggle={entry.disableToggle}
-        onPress={() => router.push(`/task/${entry.task.id}`)}
+        onPress={() => router.push(routes.task(entry.task.id))}
         onToggle={(value) =>
           void toggleTaskCompletion(
             entry.task.id,
@@ -266,7 +312,7 @@ export default function TasksScreen() {
           icon="add"
           label="Neue Aufgabe"
           variant="primary"
-          onPress={() => router.push('/task/new')}
+          onPress={() => router.push(routes.newTask)}
         />
       }
     >
@@ -274,6 +320,17 @@ export default function TasksScreen() {
 
       {view === 'list' ? (
         <>
+          <Glass radius={26}>
+            <TaskComposer
+              placeholder={
+                activeFilter
+                  ? `Aufgabe in „${tagsById[activeFilter]?.name ?? 'Tag'}“ hinzufügen`
+                  : 'Aufgabe hinzufügen'
+              }
+              onSubmit={addTaskFromList}
+            />
+          </Glass>
+
           {usedTags.length > 1 ? (
             <ScrollView
               horizontal
@@ -318,7 +375,7 @@ export default function TasksScreen() {
           {sections.length === 0 && completed.length === 0 && completedTagEntries.length === 0 ? (
             <EmptyState
               title="Noch keine Aufgaben"
-              description="Lege oben rechts die erste Aufgabe an."
+              description="Tippe oben einen Titel ein. Datum und Tag lassen sich danach ergänzen."
             />
           ) : null}
           {sections.length === 0 && (completed.length > 0 || completedTagEntries.length > 0) ? (
@@ -326,10 +383,23 @@ export default function TasksScreen() {
           ) : null}
 
           {sections.map((section) => (
-            <View key={section.title} style={styles.section}>
-              <Text style={styles.sectionTitle} accessibilityRole="header">
-                {section.title}
-              </Text>
+            <View key={section.key} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle} accessibilityRole="header">
+                  {section.title} · {section.entries.length}
+                </Text>
+                {section.key === 'overdue' ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Alle überfälligen Aufgaben auf heute verschieben"
+                    onPress={() => void moveOverdueToToday(section.entries)}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.sectionAction, pressed ? styles.pressed : null]}
+                  >
+                    <Text style={styles.sectionActionLabel}>Alle auf heute</Text>
+                  </Pressable>
+                ) : null}
+              </View>
               <Glass radius={26}>{renderRows(section.entries)}</Glass>
             </View>
           ))}
@@ -401,26 +471,11 @@ export default function TasksScreen() {
             </View>
             <Glass radius={26}>
               {renderRows(dayEntries)}
-              <View style={[styles.composer, dayEntries.length > 0 ? styles.composerSeparated : null]}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Aufgabe für diesen Tag hinzufügen"
-                  onPress={submitDraft}
-                  style={styles.composerIcon}
-                >
-                  <Ionicons name="add" size={22} color={colors.textPrimary} />
-                </Pressable>
-                <TextInput
-                  value={draft}
-                  onChangeText={setDraft}
-                  onSubmitEditing={submitDraft}
-                  placeholder="Neue Aufgabe für diesen Tag"
-                  placeholderTextColor={colors.textMuted}
-                  accessibilityLabel="Neue Aufgabe für diesen Tag"
-                  returnKeyType="done"
-                  style={styles.composerInput}
-                />
-              </View>
+              <TaskComposer
+                placeholder="Neue Aufgabe für diesen Tag"
+                onSubmit={addTaskForSelectedDate}
+                separated={dayEntries.length > 0}
+              />
             </Glass>
           </View>
         </>
@@ -483,6 +538,23 @@ const styles = themedStyles(() => ({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  sectionHeader: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionAction: {
+    paddingHorizontal: 8,
+  },
+  sectionActionLabel: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  pressed: {
+    opacity: 0.6,
+  },
   completedToggle: {
     minHeight: 50,
     flexDirection: 'row',
@@ -498,28 +570,6 @@ const styles = themedStyles(() => ({
   },
   completedCount: {
     color: colors.textSecondary,
-    fontSize: 17,
-  },
-  composer: {
-    minHeight: 50,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  composerSeparated: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  composerIcon: {
-    width: 54,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  composerInput: {
-    flex: 1,
-    minHeight: 44,
-    paddingRight: 16,
-    color: colors.textPrimary,
     fontSize: 17,
   },
 }));

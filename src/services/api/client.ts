@@ -18,7 +18,7 @@ export const postJson = async <TPayload>(
   const backendUrl = useSettingsStore.getState().backendUrl;
   const userId = await getUserIdSetting();
   if (!userId) {
-    throw new Error('Keine userId konfiguriert. Bitte in Phase 4 einrichten.');
+    throw new Error('Keine userId eingerichtet. Bitte unter Einstellungen › Verbindung eintragen.');
   }
   const response = await fetch(`${backendUrl}${endpoint}`, {
     method: 'POST',

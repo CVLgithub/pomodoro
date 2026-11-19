@@ -8,18 +8,16 @@ import {
   RoundControl,
 } from '../../src/components/timer/SessionControls';
 import { SessionStage } from '../../src/components/timer/SessionStage';
-import { Glass } from '../../src/components/ui/Glass';
+import { TodayCapsule } from '../../src/components/timer/TodayCapsule';
 import { colors } from '../../src/constants/colors';
 import { useStopwatch } from '../../src/hooks/useStopwatch';
-import { useTodayFocusMinutes } from '../../src/hooks/useTodayFocusMinutes';
 import { useStopwatchStore } from '../../src/store/stopwatchStore';
 import { useTagsStore } from '../../src/store/tagsStore';
 import { useTasksStore } from '../../src/store/tasksStore';
 import { themedStyles } from '../../src/theme/runtime';
-import { formatElapsedClock, formatMinutesLong } from '../../src/utils/duration';
+import { formatElapsedClock } from '../../src/utils/duration';
 
 export default function StopwatchScreen() {
-  const focusMinutesToday = useTodayFocusMinutes();
   const stopwatch = useStopwatch();
   const tasks = useTasksStore((state) => state.tasks);
   const tags = useTagsStore((state) => state.tags);
@@ -52,9 +50,7 @@ export default function StopwatchScreen() {
           <Text style={styles.title} accessibilityRole="header">
             Stoppuhr
           </Text>
-          <Glass radius={22} style={styles.capsule}>
-            <Text style={styles.capsuleLabel}>Heute {formatMinutesLong(focusMinutesToday)}</Text>
-          </Glass>
+          <TodayCapsule />
         </>
       }
       eyebrow={
@@ -113,16 +109,6 @@ const styles = themedStyles(() => ({
     lineHeight: 34,
     fontWeight: '700',
     letterSpacing: -0.6,
-  },
-  capsule: {
-    height: 44,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  capsuleLabel: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
   },
   status: {
     flexDirection: 'row',

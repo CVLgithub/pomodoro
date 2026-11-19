@@ -9,6 +9,7 @@ import { MAX_TIMER_MINUTES, TIMER_MODES } from '../../src/constants/timerModes';
 import { useTimerStore } from '../../src/store/timerStore';
 import { themedStyles } from '../../src/theme/runtime';
 import { haptics } from '../../src/utils/haptics';
+import { stepDurationMinutes } from '../../src/utils/timerDurations';
 
 /** Wahl des Timer-Modus und der Dauer je Modus. Beides lässt sich nur im Leerlauf ändern. */
 export default function TimerModeSheet() {
@@ -75,14 +76,14 @@ export default function TimerModeSheet() {
                   icon="remove"
                   label={`${entry.label} kürzer`}
                   disabled={!isIdle || minutes <= 1}
-                  onPress={() => changeMinutes(minutes - 1)}
+                  onPress={() => changeMinutes(stepDurationMinutes(minutes, -1, MAX_TIMER_MINUTES))}
                 />
                 <Text style={styles.stepperValue}>{minutes} Min.</Text>
                 <CircleButton
                   icon="add"
                   label={`${entry.label} länger`}
                   disabled={!isIdle || minutes >= MAX_TIMER_MINUTES}
-                  onPress={() => changeMinutes(minutes + 1)}
+                  onPress={() => changeMinutes(stepDurationMinutes(minutes, 1, MAX_TIMER_MINUTES))}
                 />
               </View>
             </View>

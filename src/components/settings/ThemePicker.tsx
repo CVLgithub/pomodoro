@@ -56,7 +56,7 @@ export const ThemePicker = () => {
 const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   option: {
     flex: 1,
@@ -65,8 +65,9 @@ const styles = themedStyles(() => ({
     paddingVertical: 2,
   },
   ring: {
-    width: 60,
-    height: 60,
+    width: '100%',
+    maxWidth: 60,
+    aspectRatio: 1,
     borderRadius: 30,
     padding: 3,
     borderWidth: 2,

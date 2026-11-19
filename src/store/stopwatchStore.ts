@@ -5,12 +5,17 @@ import { getStopwatchState, saveStopwatchState } from '../db/repositories/stopwa
 import { createSession } from '../db/repositories/sessionsRepository';
 import { getTagById } from '../db/repositories/tagsRepository';
 import { getTaskById } from '../db/repositories/tasksRepository';
+import { announceSavedSession } from '../services/feedback/sessionFeedback';
 import { toSessionPushPayload } from '../services/sync/payloads';
 import { syncManager } from '../services/sync/syncManager';
 import { StopwatchStateRecord } from '../types/stopwatch';
 import { formatDateKey, toLocalIsoString } from '../utils/date';
 import { useSessionsStore } from './sessionsStore';
 import { useSyncStore } from './syncStore';
+import { showToast } from './uiStore';
+
+/** Kürzere Messungen gelten als versehentlich gestartet und werden nicht gespeichert. */
+const MIN_RECORDED_SECONDS = 30;
 
 interface StopwatchStoreState extends StopwatchStateRecord {
   isHydrated: boolean;
@@ -138,7 +143,7 @@ export const useStopwatchStore = create<StopwatchStoreState>((set, get) => ({
       (current.phase === 'active' ? currentPhaseSeconds : 0);
     const startTime = current.sessionStartedAt ?? toLocalIsoString(now);
 
-    if (activeElapsedSeconds > 0) {
+    if (activeElapsedSeconds >= MIN_RECORDED_SECONDS) {
       const task = current.selectedTaskId ? await getTaskById(current.selectedTaskId) : null;
       const tag = await getTagById(task?.tagId ?? current.selectedTagId);
       const session = await createSession({
@@ -152,8 +157,11 @@ export const useStopwatchStore = create<StopwatchStoreState>((set, get) => ({
       });
 
       await useSessionsStore.getState().loadSessions();
+      announceSavedSession(session);
       await swallowSyncError(syncManager.pushSession(toSessionPushPayload(session)));
       await useSyncStore.getState().loadQueue();
+    } else {
+      showToast({ message: 'Unter 30 Sekunden Fokus – nichts gespeichert' });
     }
 
     const nextState = resetStopwatch(current);
@@ -171,7 +179,7 @@ export const useStopwatchStore = create<StopwatchStoreState>((set, get) => ({
 
     const task = await getTaskById(taskId);
     if (!task) {
-      throw new Error('Task not found');
+      throw new Error('Die Aufgabe wurde nicht gefunden.');
     }
 
     const nextState = {
@@ -184,7 +192,7 @@ export const useStopwatchStore = create<StopwatchStoreState>((set, get) => ({
   },
   setFreeSessionTag: async (tagId) => {
     if (!(await getTagById(tagId))) {
-      throw new Error('Tag not found');
+      throw new Error('Der Tag wurde nicht gefunden.');
     }
 
     const nextState = {

@@ -238,3 +238,101 @@ export const formatHoursClock = (minutes: number): string => {
   const safeMinutes = Math.max(0, Math.round(minutes));
   return `${Math.floor(safeMinutes / 60)}:${String(safeMinutes % 60).padStart(2, '0')}`;
 };
+
+/**
+ * Anzahl aufeinanderfolgender Tage mit mindestens einer Session, die heute
+ * oder gestern endet. Ein heute noch leerer Tag unterbricht die Serie nicht.
+ */
+export const computeFocusStreak = (sessions: Session[], todayKey: string): number => {
+  const activeDays = new Set(
+    sessions.filter((session) => session.durationMinutes > 0).map((session) => session.date),
+  );
+  let cursor = activeDays.has(todayKey) ? todayKey : formatDateKey(addDays(todayKey, -1));
+  let streak = 0;
+
+  while (activeDays.has(cursor)) {
+    streak += 1;
+    cursor = formatDateKey(addDays(cursor, -1));
+  }
+
+  return streak;
+};
+
+export interface PeriodComparison {
+  previousMinutes: number;
+  /** Veränderung in Prozent, gerundet; `null`, wenn es vorher nichts zu vergleichen gab. */
+  changePercent: number | null;
+  /** Bezeichnung des Vergleichszeitraums, z. B. "Vorwoche". */
+  label: string;
+}
+
+const PREVIOUS_PERIOD_LABELS: Record<Exclude<StatsPeriod, 'all'>, string> = {
+  day: 'Vortag',
+  week: 'Vorwoche',
+  month: 'Vormonat',
+};
+
+const daysBetween = (startKey: string, endKey: string): number =>
+  Math.round((parseDateKey(endKey).getTime() - parseDateKey(startKey).getTime()) / 86_400_000);
+
+/**
+ * Vergleicht die Fokuszeit eines Zeitraums mit dem Zeitraum davor. Läuft der
+ * Zeitraum noch (enthält er heute), zählt vom vorigen nur das gleich lange
+ * Stück: Mittwoch dieser Woche wird mit Montag bis Mittwoch der Vorwoche
+ * verglichen, nicht mit der ganzen Woche. Für "Gesamt" gibt es keinen Vergleich.
+ */
+export const comparePreviousPeriod = (
+  period: StatsPeriod,
+  anchor: Date,
+  sessions: Session[],
+  currentMinutes: number,
+  todayKey?: string,
+): PeriodComparison | null => {
+  if (period === 'all') {
+    return null;
+  }
+
+  const currentRange = getStatsRange(period, anchor);
+  const fullPreviousRange = getStatsRange(period, shiftStatsAnchor(period, anchor, -1));
+
+  if (!currentRange || !fullPreviousRange) {
+    return null;
+  }
+
+  const isRunning =
+    todayKey !== undefined && currentRange.startKey <= todayKey && todayKey < currentRange.endKey;
+  const truncatedEnd = isRunning
+    ? formatDateKey(addDays(fullPreviousRange.startKey, daysBetween(currentRange.startKey, todayKey)))
+    : fullPreviousRange.endKey;
+  const previousRange = {
+    startKey: fullPreviousRange.startKey,
+    endKey: truncatedEnd < fullPreviousRange.endKey ? truncatedEnd : fullPreviousRange.endKey,
+  };
+  const previousMinutes = filterSessionsByRange(sessions, previousRange).reduce(
+    (sum, session) => sum + session.durationMinutes,
+    0,
+  );
+
+  return {
+    previousMinutes,
+    changePercent:
+      previousMinutes === 0
+        ? null
+        : Math.round(((currentMinutes - previousMinutes) / previousMinutes) * 100),
+    label: PREVIOUS_PERIOD_LABELS[period],
+  };
+};
+
+/** Kurztext für den Vergleich, z. B. "+18 % ggü. Vorwoche"; `null` ohne Vergleichswert. */
+export const formatPeriodComparison = (comparison: PeriodComparison): string | null => {
+  if (comparison.changePercent === null) {
+    return null;
+  }
+
+  if (comparison.changePercent === 0) {
+    return `wie ${comparison.label === 'Vortag' ? 'am Vortag' : comparison.label === 'Vorwoche' ? 'in der Vorwoche' : 'im Vormonat'}`;
+  }
+
+  const sign = comparison.changePercent > 0 ? '+' : '−';
+  return `${sign}${Math.abs(comparison.changePercent)} % ggü. ${comparison.label}`;
+};

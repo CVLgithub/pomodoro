@@ -9,13 +9,17 @@ import { getTaskById } from '../db/repositories/tasksRepository';
 import { getTimerState, saveTimerState } from '../db/repositories/timerStateRepository';
 import { syncManager } from '../services/sync/syncManager';
 import { toSessionPushPayload } from '../services/sync/payloads';
+import { announceSavedSession } from '../services/feedback/sessionFeedback';
 import { buildFocusSession, isTimerExpired } from '../services/timer/timerResume';
 import { timerEngine } from '../services/timer/timerEngine';
 import { TimerMode, TimerStateRecord } from '../types/timer';
+import { Session } from '../types/session';
 import { getTodayDateKey, toLocalIsoString } from '../utils/date';
+import { haptics } from '../utils/haptics';
 import { useSessionsStore } from './sessionsStore';
 import { useSettingsStore } from './settingsStore';
 import { useSyncStore } from './syncStore';
+import { showToast } from './uiStore';
 
 type TimerStateShape = Omit<TimerStateRecord, 'updatedAt'>;
 let durationSaveRequestId = 0;
@@ -116,12 +120,15 @@ const maybeNotifyDailyFocusGoalReached = async (sessionDurationMinutes: number):
 };
 
 /** Speichert die Fokuszeit einer beendeten Session und stößt Statistik, Tagesziel und Sync an. */
-const recordFocusSession = async (state: TimerStateRecord, endedAt: string): Promise<void> => {
+const recordFocusSession = async (
+  state: TimerStateRecord,
+  endedAt: string,
+): Promise<Session | null> => {
   const task = state.selectedTaskId ? await getTaskById(state.selectedTaskId) : null;
   const sessionInput = buildFocusSession(state, task, endedAt);
 
   if (!sessionInput) {
-    return;
+    return null;
   }
 
   const createdSession = await createSession(sessionInput);
@@ -129,6 +136,7 @@ const recordFocusSession = async (state: TimerStateRecord, endedAt: string): Pro
   await useSessionsStore.getState().loadSessions();
   await swallowSyncError(syncManager.pushSession(toSessionPushPayload(createdSession)));
   await useSyncStore.getState().loadQueue();
+  return createdSession;
 };
 
 export const useTimerStore = create<TimerStoreState>((set, get) => ({
@@ -175,7 +183,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
   setDurations: async (durations) => {
     const values = Object.values(durations);
     if (values.some((value) => typeof value === 'number' && value <= 0)) {
-      throw new Error('Minutes must be greater than zero');
+      throw new Error('Die Dauer muss mindestens eine Minute betragen.');
     }
 
     const nextState = timerEngine.withDurations(get(), durations);
@@ -208,7 +216,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     const task = await getTaskById(taskId);
 
     if (!task) {
-      throw new Error('Task not found');
+      throw new Error('Die Aufgabe wurde nicht gefunden.');
     }
 
     const persisted = await saveTimerState(
@@ -225,7 +233,7 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
     const tag = await getTagById(tagId);
 
     if (!tag) {
-      throw new Error('Tag not found');
+      throw new Error('Der Tag wurde nicht gefunden.');
     }
 
     const persisted = await saveTimerState(
@@ -308,7 +316,10 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
 
     const now = new Date();
     const endedAt = toLocalIsoString(now);
-    const nextState = timerEngine.finishNow(current, now);
+    const finished = timerEngine.finishNow(current, now);
+    // Eine vorzeitig beendete Pause führt direkt zurück in den Fokus.
+    const nextState =
+      current.activeMode === 'focus' ? finished : timerEngine.withMode(finished, 'focus');
     set({ ...nextState });
     const persisted = await saveTimerState(stripUpdatedAt(nextState));
     await notificationService.cancelTimerCompletionNotification();
@@ -323,7 +334,12 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
       return;
     }
 
-    await recordFocusSession(current, endedAt);
+    const session = await recordFocusSession(current, endedAt);
+    if (session) {
+      announceSavedSession(session);
+    } else {
+      showToast({ message: 'Unter 30 Sekunden Fokus – nichts gespeichert' });
+    }
   },
   reconcileWithClock: async () => {
     const current = get();
@@ -349,9 +365,17 @@ export const useTimerStore = create<TimerStoreState>((set, get) => ({
 
     set({ ...persisted });
 
+    haptics.success();
+
     if (completion.completedMode === 'focus') {
-      await recordFocusSession(current, completion.completedAt);
+      const session = await recordFocusSession(current, completion.completedAt);
+      if (session) {
+        announceSavedSession(session, 'Fokus geschafft');
+      }
+      return;
     }
+
+    showToast({ message: 'Pause vorbei – bereit für die nächste Runde', tone: 'success' });
   },
   handleDeletedTask: async (taskId) => {
     const current = get();

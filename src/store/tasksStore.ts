@@ -72,7 +72,7 @@ export const useTasksStore = create<TasksStoreState>((set, get) => ({
   },
   createTask: async (input) => {
     if (!input.title.trim()) {
-      throw new Error('Title is required');
+      throw new Error('Bitte gib einen Titel ein.');
     }
 
     const task = await createTaskRecord({
@@ -86,7 +86,7 @@ export const useTasksStore = create<TasksStoreState>((set, get) => ({
   },
   updateTask: async (id, input) => {
     if (input.title !== undefined && !input.title.trim()) {
-      throw new Error('Title is required');
+      throw new Error('Bitte gib einen Titel ein.');
     }
 
     const task = await updateTaskRecord(id, input);
@@ -123,12 +123,12 @@ export const useTasksStore = create<TasksStoreState>((set, get) => ({
     const task = get().tasks.find((entry) => entry.id === id);
 
     if (!task) {
-      throw new Error('Task not found');
+      throw new Error('Die Aufgabe wurde nicht gefunden.');
     }
 
     if (isTaskRecurring(task)) {
       if (!options?.date) {
-        throw new Error('Recurring tasks need a specific date for completion changes.');
+        throw new Error('Bei wiederkehrenden Aufgaben muss ein Tag gewählt sein.');
       }
 
       await setTaskOccurrenceCompletion(id, options.date, isCompleted);

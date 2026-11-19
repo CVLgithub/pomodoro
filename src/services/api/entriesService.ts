@@ -37,7 +37,7 @@ export const fetchEntries = async (): Promise<EntriesResponse> => {
   const requestUrl = getEntriesRequestUrl();
   const userId = await getUserIdSetting();
   if (!userId) {
-    throw new Error('Keine userId konfiguriert. Bitte in Phase 4 einrichten.');
+    throw new Error('Keine userId eingerichtet. Bitte unter Einstellungen › Verbindung eintragen.');
   }
   let response: Response;
 

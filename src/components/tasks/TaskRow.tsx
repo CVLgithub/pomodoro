@@ -85,7 +85,12 @@ export const TaskRow = ({
           ) : null}
         </View>
       </Pressable>
-      <Pressable accessibilityRole="button" onPress={onPress} style={styles.content}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityHint="Aufgabe bearbeiten"
+        onPress={onPress}
+        style={styles.content}
+      >
         <Text
           style={[styles.title, resolvedIsCompleted ? styles.titleCompleted : null]}
           numberOfLines={2}

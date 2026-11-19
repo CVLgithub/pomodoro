@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { Session } from '../types/session';
 import {
   buildStatsBars,
+  comparePreviousPeriod,
+  computeFocusStreak,
   filterSessionsByRange,
   formatHoursClock,
+  formatPeriodComparison,
   formatStatsRangeLabel,
   getStatsRange,
   shiftStatsAnchor,
@@ -162,5 +165,78 @@ describe('Beschriftungen', () => {
     expect(formatStatsRangeLabel('week', anchor, todayKey)).toBe('9.–15. November');
     expect(formatStatsRangeLabel('week', new Date(2026, 10, 30, 12), todayKey)).toBe('30. Nov – 6. Dez');
     expect(formatStatsRangeLabel('month', anchor, todayKey)).toBe('November 2026');
+  });
+});
+
+describe('computeFocusStreak', () => {
+  it('counts consecutive days ending today', () => {
+    const list = [session('2026-11-09', 10), session('2026-11-10', 20), session('2026-11-11', 5)];
+    expect(computeFocusStreak(list, '2026-11-11')).toBe(3);
+  });
+
+  it('keeps the streak alive while today is still empty', () => {
+    const list = [session('2026-11-09', 10), session('2026-11-10', 20)];
+    expect(computeFocusStreak(list, '2026-11-11')).toBe(2);
+  });
+
+  it('stops at a gap', () => {
+    const list = [session('2026-11-07', 10), session('2026-11-09', 10), session('2026-11-10', 20)];
+    expect(computeFocusStreak(list, '2026-11-10')).toBe(2);
+  });
+
+  it('is zero without a session today or yesterday', () => {
+    expect(computeFocusStreak([session('2026-11-01', 10)], '2026-11-11')).toBe(0);
+  });
+
+  it('counts across a month boundary', () => {
+    const list = [session('2026-10-31', 10), session('2026-11-01', 10)];
+    expect(computeFocusStreak(list, '2026-11-01')).toBe(2);
+  });
+});
+
+describe('comparePreviousPeriod', () => {
+  const list = [
+    session('2026-11-03', 100), // Vorwoche (2.–8. Nov.)
+    session('2026-11-10', 150), // aktuelle Woche
+  ];
+
+  it('compares a finished week with the whole week before', () => {
+    const comparison = comparePreviousPeriod('week', anchor, list, 150);
+    expect(comparison).toEqual({ previousMinutes: 100, changePercent: 50, label: 'Vorwoche' });
+    expect(formatPeriodComparison(comparison!)).toBe('+50 % ggü. Vorwoche');
+  });
+
+  it('reports a decrease with a minus sign', () => {
+    const comparison = comparePreviousPeriod('week', anchor, list, 50);
+    expect(formatPeriodComparison(comparison!)).toBe('−50 % ggü. Vorwoche');
+  });
+
+  it('has no percentage without previous data', () => {
+    const comparison = comparePreviousPeriod('day', anchor, [session('2026-11-11', 30)], 30);
+    expect(comparison?.changePercent).toBeNull();
+    expect(formatPeriodComparison(comparison!)).toBeNull();
+  });
+
+  it('compares a running week only with the same stretch of the week before', () => {
+    // Heute ist Mittwoch, 11. Nov.: verglichen wird mit Mo. 2. bis Mi. 4. Nov.
+    const withLateSession = [...list, session('2026-11-06', 400)];
+    const comparison = comparePreviousPeriod('week', anchor, withLateSession, 150, todayKey);
+    expect(comparison?.previousMinutes).toBe(100);
+  });
+
+  it('clamps a running month to the shorter previous month', () => {
+    const march = new Date(2026, 2, 31, 12);
+    const comparison = comparePreviousPeriod(
+      'month',
+      march,
+      [session('2026-02-28', 60), session('2026-03-31', 60)],
+      60,
+      '2026-03-30',
+    );
+    expect(comparison?.previousMinutes).toBe(60);
+  });
+
+  it('has no comparison for the whole range', () => {
+    expect(comparePreviousPeriod('all', anchor, list, 250)).toBeNull();
   });
 });
