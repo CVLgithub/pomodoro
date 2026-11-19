@@ -152,7 +152,7 @@ native Abhängigkeiten auskommen:
 | Bereich | Umsetzung | Befund |
 |---------|-----------|--------|
 | Übergreifend | Toast-System (`uiStore` + `Toast`) mit optionaler Aktion, im Root-Layout eingebunden | G2 |
-| Übergreifend | Fehlermeldungen der Stores und Repositories auf Deutsch | G1 |
+| Übergreifend | Fehlermeldungen der Stores und Repositories auf Deutsch; Hinweis „Phase 4“ durch den echten Ort in den Einstellungen ersetzt | G1 |
 | Timer | Haptik und Toast beim Ablauf; Toast mit „Bearbeiten“ nach gespeicherter Session | T1, T6 |
 | Timer | Vorzeitiges Beenden einer Fokus-Session fragt nach: Speichern, Verwerfen oder Weitermachen | T2 |
 | Timer | Pause vorzeitig beenden wechselt zu Fokus; „Pause überspringen“ auch im Leerlauf | T3 |
@@ -162,9 +162,9 @@ native Abhängigkeiten auskommen:
 | Stoppuhr | „Heute“-Kapsel zeigt Fortschritt zum Tagesziel | ST3 |
 | Aufgaben | Schnelleingabe in der Listenansicht (übernimmt den Tag-Filter), Toast mit „Bearbeiten“ | A1, A6 |
 | Aufgaben | Play-Taste je offener Aufgabe: wählt sie im Timer und wechselt dorthin | A2 |
-| Aufgaben | „Alle auf heute“ bei überfälligen Aufgaben; Anzahl in jeder Abschnittsüberschrift | A3, A4 |
+| Aufgaben | „Alle auf heute“ bei überfälligen Aufgaben (mit „Rückgängig“); Anzahl in jeder Abschnittsüberschrift | A3, A4 |
 | Statistik | Balken antippbar (Woche/Monat → Tag, Gesamt → Monat) | ST1 |
-| Statistik | Vergleich mit dem vorigen Zeitraum, Serie aktiver Tage, Tagesziel in der Tagesansicht | ST2, ST3, ST4 |
+| Statistik | Vergleich mit dem vorigen Zeitraum (ein laufender Zeitraum nur mit dem gleich langen Stück davor), Serie aktiver Tage, Tagesziel in der Tagesansicht | ST2, ST3, ST4 |
 | Statistik | Nachtragen: Schnellwahl für Datum und Dauer, Live-Dauer, Zifferntastatur | ST5 |
 
 Neue reine Logik liegt in `src/utils/` und ist mit Tests abgedeckt (`timerCycle`,

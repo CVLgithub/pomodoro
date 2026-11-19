@@ -16,7 +16,8 @@
 - `src/theme/runtime.ts`: aktive Farbwelt und `themedStyles(() => ({...}))` als Ersatz fuer `StyleSheet.create` auf Modulebene.
 - `src/constants/colors.ts`: `colors.*` liest immer die aktive Farbwelt. Nur zur Renderzeit oder in `themedStyles` lesen.
 - Nach einem Wechsel der Farbwelt baut `app/_layout.tsx` den Baum ueber `key={theme}` neu auf.
-- Bausteine in `src/components/ui/`: `Glass`, `Backdrop`, `Screen`/`ScreenShell`, `GlassTabBar`, `Segmented`, `CircleButton`, `Button`, `TagChips`, `Sheet`, `TextField`.
+- Bausteine in `src/components/ui/`: `Glass`, `Backdrop`, `Screen`/`ScreenShell`, `GlassTabBar`, `Segmented`, `CircleButton`, `Button`, `TagChips`, `Sheet`, `TextField`, `Toast`.
+- Rückmeldungen ohne Unterbrechung laufen über `showToast()` aus `src/store/uiStore.ts` (auch aus Stores aufrufbar). Gespeicherte Sessions meldet `announceSavedSession()` mit der Aktion „Bearbeiten“.
 
 ## 2. Verwendete Pakete mit Installationsbefehlen
 
@@ -171,9 +172,9 @@ src/
 ## 10. Screens und zentrale UI-Komponenten
 
 - `today.tsx` (Stoppuhr): Zeit gross in der Mitte, Zuordnung und Bedienung in einer Glasflaeche, heutige Fokuszeit im Kopf.
-- `timer.tsx`: gleicher Aufbau; Modus und Dauer in einem gemeinsamen Blatt, `+5` verlaengert eine laufende oder pausierte Session.
-- `tasks.tsx`: Liste nach Faelligkeit (Ueberfaellig, Heute, Demnaechst, Wiederkehrend, Ohne Datum, Erledigt) mit Tag-Filter; der Kalender ist eine zweite Ansicht im selben Tab.
-- `stats.tsx`: Zeitraum (Tag, Woche, Monat, Gesamt), Summe, Balkendiagramm, Verteilung nach Tags, Sessions zum Bearbeiten; `+` traegt eine vergangene Session nach.
+- `timer.tsx`: gleicher Aufbau; Modus und Dauer in einem gemeinsamen Blatt, `+5` verlaengert eine laufende oder pausierte Session. Vorzeitiges Beenden einer Fokus-Session fragt nach Speichern oder Verwerfen; in Pausen wird daraus „Pause ueberspringen“.
+- `tasks.tsx`: Liste nach Faelligkeit (Ueberfaellig, Heute, Demnaechst, Wiederkehrend, Ohne Datum, Erledigt) mit Tag-Filter und Schnelleingabe; die Play-Taste einer Zeile waehlt die Aufgabe im Timer. Der Kalender ist eine zweite Ansicht im selben Tab.
+- `stats.tsx`: Zeitraum (Tag, Woche, Monat, Gesamt), Summe mit Vergleich zum Vorzeitraum und Serie, antippbares Balkendiagramm, Verteilung nach Tags, Sessions zum Bearbeiten; `+` traegt eine vergangene Session nach.
 - `settings.tsx`: Darstellung, Startseite, Pausenwechsel, Synchronisieren und Verweise auf die Unterseiten.
 - `prefs/notifications.tsx`, `prefs/tags.tsx`, `prefs/deleted-sessions.tsx`, `prefs/sync-queue.tsx`, `prefs/connection.tsx`: Unterseiten der Einstellungen.
 - `task/[id].tsx`: Aufgabe bearbeiten; Tag als Chips, Datum mit Schnellauswahl, woechentliche Wiederholung, "Im Timer verwenden".
@@ -186,6 +187,8 @@ src/
 - `src/services/sync/fullSync.ts`: `syncAndReload()` fuer Start, Rueckkehr in die App, Onboarding und den Knopf in den Einstellungen.
 - `src/services/notifications/applyPreferences.ts`: speichert Benachrichtigungs-Einstellungen inklusive Berechtigung und laufendem Timer.
 - `src/utils/stats.ts`, `src/utils/sessionInput.ts`: Auswertung der Statistik und Pruefung nachgetragener Sessions (mit Tests).
+- `src/utils/timerCycle.ts`, `src/utils/timerDurations.ts`: Rundenanzeige und Schrittweite der Dauer (mit Tests).
+- `docs/UX-BERICHT.md`: UX-/UI-Analyse mit Befunden, Feature-Ideen und Stand der Umsetzung.
 - `src/constants/routes.ts`: alle Routen an einer Stelle.
 
 ## 11. Startanleitung
