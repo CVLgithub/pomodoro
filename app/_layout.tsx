@@ -18,6 +18,7 @@ import { useTimerStore } from '../src/store/timerStore';
 import { useUiStore } from '../src/store/uiStore';
 import { UserIdOnboarding } from '../src/components/settings/UserIdOnboarding';
 import { sheetScreenOptions } from '../src/components/ui/sheetScreenOptions';
+import { Toast } from '../src/components/ui/Toast';
 import { themedStyles } from '../src/theme/runtime';
 
 const runAutomaticSync = async (reason: string): Promise<void> => {
@@ -132,6 +133,7 @@ export default function RootLayout() {
         <Stack.Screen name="sheet/stats-tag/[id]" options={sheetOptions} dangerouslySingular />
         <Stack.Screen name="sheet/new-group" options={sheetOptions} dangerouslySingular />
       </Stack>
+      <Toast />
       {!userId && !isDevUserId && !onboardingDismissed ? (
         <UserIdOnboarding
           onComplete={async () => {
